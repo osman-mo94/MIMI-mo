@@ -110,16 +110,74 @@ food_consumption$consumed <- ifelse(food_consumption$s06bq01 == 1, "Yes",
 # Create analysis data-set: 
 analysis_df <- cover %>% select("hhid", "sector", "state", "zone")
 
-# Add-in columns for staple grains - binary yes/no depending on if they have been consumed:
+# Add-in columns for target variable (staple grains) - binary yes/no depending on if they have been consumed:
 analysis_df <- analysis_df  %>%
+  # Guinea corn/sorghum:
   left_join(food_consumption %>% 
               filter(food_item == "Guinea corn/sorghum",
                      consumed == "Yes") %>% 
               # Create a column in analysis_df for these individuals
               select("hhid", "consumed") %>%
-              rename("Guinea corn/sorghum" = "consumed"),
+              rename("gcorn_sorghum" = "consumed"),
+            by = "hhid") %>% 
+  # Millet:
+  left_join(food_consumption %>% 
+              filter(food_item == "Millet",
+                     consumed == "Yes") %>% 
+              # Create a column in analysis_df for these individuals
+              select("hhid", "consumed") %>%
+              rename("millet" = "consumed"),
+            by = "hhid") %>% 
+  # Rice (local):
+  left_join(food_consumption %>% 
+              filter(food_item == "Rice (local)",
+                     consumed == "Yes") %>% 
+              # Create a column in analysis_df for these individuals
+              select("hhid", "consumed") %>%
+              rename("rice_local" = "consumed"),
+            by = "hhid") %>% 
+  # Rice (imported):
+  left_join(food_consumption %>% 
+              filter(food_item == "Rice (imported)",
+                     consumed == "Yes") %>% 
+              # Create a column in analysis_df for these individuals
+              select("hhid", "consumed") %>%
+              rename("rice_imported" = "consumed"),
+            by = "hhid") %>% 
+  # Maize flour: 
+  left_join(food_consumption %>% 
+              filter(food_item == "Maize flour",
+                     consumed == "Yes") %>% 
+              # Create a column in analysis_df for these individuals
+              select("hhid", "consumed") %>%
+              rename("maize_flour" = "consumed"),
+            by = "hhid") %>% 
+  # Wheat flour: 
+  left_join(food_consumption %>% 
+              filter(food_item == "Wheat flour",
+                     consumed == "Yes") %>% 
+              # Create a column in analysis_df for these individuals
+              select("hhid", "consumed") %>%
+              rename("wheat_flour" = "consumed"),
             by = "hhid")
 
-# If the new column above contains NA, then replace with "No":
-analysis_df$`Guinea corn/sorghum` <- ifelse(is.na(analysis_df$`Guinea corn/sorghum`), "No", 
-                                            analysis_df$`Guinea corn/sorghum`)
+
+# If the new columns above contains NA, then replace with "No":
+analysis_df$gcorn_sorghum <- ifelse(is.na(analysis_df$gcorn_sorghum), "No", 
+                                            analysis_df$gcorn_sorghum)
+
+analysis_df$millet <- ifelse(is.na(analysis_df$millet), "No", 
+                             analysis_df$millet)
+
+analysis_df$rice_local <- ifelse(is.na(analysis_df$rice_local), "No", 
+                             analysis_df$rice_local)
+
+analysis_df$rice_imported <- ifelse(is.na(analysis_df$rice_imported), "No", 
+                                 analysis_df$rice_imported)
+
+analysis_df$maize_flour <- ifelse(is.na(analysis_df$maize_flour), "No", 
+                                 analysis_df$maize_flour)
+
+analysis_df$wheat_flour <- ifelse(is.na(analysis_df$wheat_flour), "No", 
+                                 analysis_df$wheat_flour)
+
