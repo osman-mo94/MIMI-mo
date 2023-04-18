@@ -3,7 +3,8 @@
 ################################################################################
 
 # Install and load required packages:
-rq_packages <- c("readr", "tidyverse", "ggplot2", "janitor")
+rq_packages <- c("readr", "tidyverse", "ggplot2", "janitor", "knitr",
+                 "wesanderson", "ghibli", "ggthemes")
 
 installed_packages <- rq_packages %in% rownames(installed.packages())
 if (any(installed_packages == FALSE)) {
@@ -181,3 +182,53 @@ analysis_df$maize_flour <- ifelse(is.na(analysis_df$maize_flour), "No",
 analysis_df$wheat_flour <- ifelse(is.na(analysis_df$wheat_flour), "No", 
                                  analysis_df$wheat_flour)
 
+#-------------------------------------------------------------------------------
+
+# Summary statistics for intake of staple grains:
+View(analysis_df)
+
+gcorn_consumption <- analysis_df %>% count(gcorn_sorghum) %>% 
+  mutate(percentage = round(n/sum(n) * 100, digits = 1))
+
+millet_consumption <- analysis_df %>% count(millet) %>% 
+  mutate(percentage = round(n/sum(n) * 100, digits = 1)) 
+
+riceloc_consumption <- analysis_df %>% count(rice_local) %>% 
+  mutate(percentage = round(n/sum(n) * 100, digits = 1)) 
+
+riceimp_consumption <- analysis_df %>% count(rice_imported) %>% 
+  mutate(percentage = round(n/sum(n) * 100, digits = 1)) 
+
+maizef_consumption <- analysis_df %>% count(maize_flour) %>% 
+  mutate(percentage = round(n/sum(n) * 100, digits = 1)) 
+
+wheatf_consumption <- analysis_df %>% count(wheat_flour) %>% 
+  mutate(percentage = round(n/sum(n) * 100, digits = 1)) 
+
+# Visualise percentage of households consuming each staple grain in a barplot:
+
+grain <- c("Guinea corn/sorghum", "Millet", "Rice (local)", "Rice (imported)", 
+           "Maize flour", "Wheat flour")
+
+percentage_consumed <- c(gcorn_consumption[2,3], millet_consumption[2,3], 
+                         riceloc_consumption[2,3], riceimp_consumption[2,3], 
+                         maizef_consumption[2,3], wheatf_consumption[2,3])
+
+percentage_consumed <- as.double(percentage_consumed)
+
+grain_consumption <- data.frame(grain, percentage_consumed) %>% 
+  arrange(desc(percentage_consumed))
+
+colour_palette <- ghibli_palette("PonyoMedium", n = 6)
+
+ggplot(grain_consumption, aes(x = reorder(grain, -percentage_consumed), 
+                              y = percentage_consumed, fill = grain)) + 
+  geom_col(show.legend = F) + labs(x = "Grain", y = "% of Households") +
+  scale_fill_manual(values = colour_palette) + theme_pander()
+
+# Remove objects no longer required: 
+rm(list = c("colour_palette", "grain", "percentage_consumed", "gcorn_consumption",
+            "grain_consumption", "maizef_consumption", "millet_consumption",
+            "riceimp_consumption", "riceloc_consumption", "wheatf_consumption"))
+
+#-------------------------------------------------------------------------------
