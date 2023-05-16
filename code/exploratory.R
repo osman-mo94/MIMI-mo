@@ -38,7 +38,7 @@ cover %>% get_dupes(-hhid) # No duplicates found
 nrow(cover) # 22587 households were included in this survey
 
 # How many states are represented in the survey:
-n_distinct(cover$state) # 37 states are represented in the survey
+n_distinct(cover$state) # 36 states and the Federal Capital Territory are represented
 
 # Create a table to count number of households per state:
 cover %>% count(state) %>% arrange(desc(n)) %>% knitr::kable()
@@ -106,6 +106,16 @@ food_consumption <- food_consumption  %>% mutate(food_item = dplyr::case_when(
 food_consumption$consumed <- ifelse(food_consumption$s06bq01 == 1, "Yes", 
                                     ifelse(food_consumption$s06bq01 == 2, "No", NA))
 
+# Quantify how much of the food items were consumed
+
+# Firstly rename columns with more useful names: 
+food_consumption <- food_consumption %>% 
+  rename(quantity_consumed = s06bq02a, 
+         quantity_unit = s06bq02b,
+         unit_other = s06bq02b_os,
+         quantity_size = s06bq02c,
+         conversion_factor = s06bq02_cvn)
+
 #-------------------------------------------------------------------------------
 
 # Create analysis data-set: 
@@ -113,22 +123,6 @@ analysis_df <- cover %>% select("hhid", "sector", "state", "zone")
 
 # Add-in columns for target variable (staple grains) - binary yes/no depending on if they have been consumed:
 analysis_df <- analysis_df  %>%
-  # Guinea corn/sorghum:
-  left_join(food_consumption %>% 
-              filter(food_item == "Guinea corn/sorghum",
-                     consumed == "Yes") %>% 
-              # Create a column in analysis_df for these individuals
-              select("hhid", "consumed") %>%
-              rename("gcorn_sorghum" = "consumed"),
-            by = "hhid") %>% 
-  # Millet:
-  left_join(food_consumption %>% 
-              filter(food_item == "Millet",
-                     consumed == "Yes") %>% 
-              # Create a column in analysis_df for these individuals
-              select("hhid", "consumed") %>%
-              rename("millet" = "consumed"),
-            by = "hhid") %>% 
   # Rice (local):
   left_join(food_consumption %>% 
               filter(food_item == "Rice (local)",
@@ -160,16 +154,42 @@ analysis_df <- analysis_df  %>%
               # Create a column in analysis_df for these individuals
               select("hhid", "consumed") %>%
               rename("wheat_flour" = "consumed"),
-            by = "hhid")
+            by = "hhid") %>% 
+  # Bread: 
+  left_join(food_consumption %>% 
+              filter(food_item == "Bread",
+                     consumed == "Yes") %>% 
+              # Create a column in analysis_df for these individuals
+              select("hhid", "consumed") %>% 
+              rename("bread" = "consumed"), 
+            by = "hhid") %>% 
+  # Cake: 
+  left_join(food_consumption %>% 
+              filter(food_item == "Cake",
+                     consumed == "Yes") %>% 
+              # Create a column in analysis_df for these individuals
+              select("hhid", "consumed") %>% 
+              rename("cake" = "consumed"), 
+            by = "hhid") %>% 
+  # Buns/Pofpof/Donuts: 
+  left_join(food_consumption %>% 
+              filter(food_item == "Buns/Pofpof/Donuts",
+                     consumed == "Yes") %>% 
+              # Create a column in analysis_df for these individuals
+              select("hhid", "consumed") %>% 
+              rename("buns_pofpof_donuts" = "consumed"), 
+            by = "hhid") %>% 
+  # Biscuits: 
+  left_join(food_consumption %>% 
+              filter(food_item == "Biscuits",
+                     consumed == "Yes") %>% 
+              # Create a column in analysis_df for these individuals
+              select("hhid", "consumed") %>% 
+              rename("biscuits" = "consumed"), 
+            by = "hhid") 
 
 
 # If the new columns above contains NA, then replace with "No":
-analysis_df$gcorn_sorghum <- ifelse(is.na(analysis_df$gcorn_sorghum), "No", 
-                                            analysis_df$gcorn_sorghum)
-
-analysis_df$millet <- ifelse(is.na(analysis_df$millet), "No", 
-                             analysis_df$millet)
-
 analysis_df$rice_local <- ifelse(is.na(analysis_df$rice_local), "No", 
                              analysis_df$rice_local)
 
@@ -182,16 +202,38 @@ analysis_df$maize_flour <- ifelse(is.na(analysis_df$maize_flour), "No",
 analysis_df$wheat_flour <- ifelse(is.na(analysis_df$wheat_flour), "No", 
                                  analysis_df$wheat_flour)
 
+analysis_df$bread <- ifelse(is.na(analysis_df$bread), "No", 
+                                  analysis_df$bread)
+
+analysis_df$cake <- ifelse(is.na(analysis_df$cake), "No", 
+                                  analysis_df$cake)
+
+analysis_df$buns_pofpof_donuts <- ifelse(is.na(analysis_df$buns_pofpof_donuts), "No", 
+                                  analysis_df$buns_pofpof_donuts)
+
+analysis_df$biscuits <- ifelse(is.na(analysis_df$biscuits), "No", 
+                                  analysis_df$biscuits)
+
+# Assuming that bread, cake, buns/pofpof/donuts and biscuits all contain wheat flour, 
+# consolidate these into 1 wheat_flour column, that will indicate "Yes" if any of
+# the food items are consumed:
+
+analysis_df$wheat_flour <- ifelse(analysis_df$bread == "Yes" | 
+                                    analysis_df$cake == "Yes" | 
+                                    analysis_df$buns_pofpof_donuts == "Yes" | 
+                                    analysis_df$biscuits == "Yes", "Yes", 
+                                  analysis_df$wheat_flour)
+
+# Now remove the other columns to include only the 4 staple grains: local rice, 
+# imported rice, maize flour, wheat flour.
+
+analysis_df <- analysis_df %>% 
+  select(-bread, -cake, -buns_pofpof_donuts, -biscuits)
+
 #-------------------------------------------------------------------------------
 
 # Summary statistics for intake of staple grains:
 View(analysis_df)
-
-gcorn_consumption <- analysis_df %>% count(gcorn_sorghum) %>% 
-  mutate(percentage = round(n/sum(n) * 100, digits = 1))
-
-millet_consumption <- analysis_df %>% count(millet) %>% 
-  mutate(percentage = round(n/sum(n) * 100, digits = 1)) 
 
 riceloc_consumption <- analysis_df %>% count(rice_local) %>% 
   mutate(percentage = round(n/sum(n) * 100, digits = 1)) 
@@ -205,13 +247,12 @@ maizef_consumption <- analysis_df %>% count(maize_flour) %>%
 wheatf_consumption <- analysis_df %>% count(wheat_flour) %>% 
   mutate(percentage = round(n/sum(n) * 100, digits = 1)) 
 
-# Visualise percentage of households consuming each staple grain in a barplot:
 
-grain <- c("Guinea corn/sorghum", "Millet", "Rice (local)", "Rice (imported)", 
-           "Maize flour", "Wheat flour")
+# Visualise percentage of households consuming each food in a barplot:
 
-percentage_consumed <- c(gcorn_consumption[2,3], millet_consumption[2,3], 
-                         riceloc_consumption[2,3], riceimp_consumption[2,3], 
+grain <- c("Rice (local)", "Rice (imported)", "Maize flour", "Wheat flour")
+
+percentage_consumed <- c(riceloc_consumption[2,3], riceimp_consumption[2,3], 
                          maizef_consumption[2,3], wheatf_consumption[2,3])
 
 percentage_consumed <- as.double(percentage_consumed)
@@ -219,16 +260,11 @@ percentage_consumed <- as.double(percentage_consumed)
 grain_consumption <- data.frame(grain, percentage_consumed) %>% 
   arrange(desc(percentage_consumed))
 
-colour_palette <- ghibli_palette("PonyoMedium", n = 6)
+colour_palette <- ghibli_palette("PonyoMedium", n = 4)
 
 ggplot(grain_consumption, aes(x = reorder(grain, -percentage_consumed), 
                               y = percentage_consumed, fill = grain)) + 
-  geom_col(show.legend = F) + labs(x = "Grain", y = "% of Households") +
-  scale_fill_manual(values = colour_palette) + theme_pander()
-
-# Remove objects no longer required: 
-rm(list = c("colour_palette", "grain", "percentage_consumed", "gcorn_consumption",
-            "grain_consumption", "maizef_consumption", "millet_consumption",
-            "riceimp_consumption", "riceloc_consumption", "wheatf_consumption"))
+  geom_col(show.legend = F) + labs(x = "Grain", y = "% of Households") 
+ scale_fill_manual(values = colour_palette) + theme_pander()
 
 #-------------------------------------------------------------------------------
