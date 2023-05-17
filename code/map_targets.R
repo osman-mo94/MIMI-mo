@@ -35,6 +35,17 @@ plot(nigeria_0$geometry)
 plot(nigeria_1$geometry)
 plot(nigeria_2$geometry)
 
+# Transform location names to lowercase ready for data-linkage:
+nigeria_1$shapeName <- tolower(nigeria_1$shapeName)
+nigeria_2$shapeName <- tolower(nigeria_2$shapeName)
+
+# Rename "abuja federal capital territory" to match how it is recorded in NLSS:
+nigeria_1$shapeName <- ifelse(nigeria_1$shapeName == "abuja federal capital territory", 
+                              "fct", nigeria_1$shapeName)
+
+# Rename "shapeName" column as "state":
+names(nigeria_1)[names(nigeria_1) == "shapeName"] <- "state"
+
 #-------------------------------------------------------------------------------
 
 # Extract location data for each household:
@@ -89,4 +100,39 @@ household_locations <- merge(household_locations, lga_dictionary,
 # Rename columns:
 household_locations <- household_locations %>% select(-lga)
 names(household_locations)[names(household_locations) == "Category"] <- "lga"
+
+# Remove dictionary dataframes as these are no longer required: 
+rm(list = c("zone_dictionary", "state_dictionary", "lga_dictionary"))
+
+# Transform the zone, state and lga columns into all lowercase to make linkage easier: 
+household_locations$zone <- tolower(household_locations$zone)
+household_locations$state <- tolower(household_locations$state)
+household_locations$lga <- tolower(household_locations$lga)
+
+#-------------------------------------------------------------------------------
+
+# Source the target variables script:
+source("code/target_variables.R")
+
+# Merge the df with locations to the df with targets
+locations_targets <- household_locations %>% 
+  left_join(target_variables,
+            by = "hhid")
+
+#-------------------------------------------------------------------------------
+
+# Calculate reach aggregated at the state level for each grain:
+
+reach_state <- locations_targets %>% 
+  group_by(state) %>% 
+  summarise(reach_rice_local = sum(rice_local == "Yes") / n(),
+            reach_rice_imported = sum(rice_imported == "Yes") / n(),
+            reach_wheatf = sum(wheat_flour == "Yes") / n(),
+            reach_maizef = sum(maize_flour == "Yes") / n())
+
+#-------------------------------------------------------------------------------
+
+# Join reach_state to nigeria_1 
+class(nigeria_1)
+class(reach_state)
 
