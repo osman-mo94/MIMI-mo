@@ -79,7 +79,7 @@ food_consumption <- food_consumption %>%
 #-------------------------------------------------------------------------------
 
 # Create df for target variables, for each household ID: 
-target_variables <- cover %>% select("hhid")
+target_variables <- cover %>% dplyr::select("hhid")
 
 # Add-in columns for target variable (staple grains) - binary yes/no depending on if they have been consumed:
 target_variables <- target_variables %>%
@@ -88,7 +88,7 @@ target_variables <- target_variables %>%
               filter(food_item == "Rice (local)",
                      consumed == "Yes") %>% 
               # Create a column in analysis_df for these individuals
-              select("hhid", "consumed") %>%
+              dplyr::select("hhid", "consumed") %>%
               rename("rice_local" = "consumed"),
             by = "hhid") %>% 
   # Rice (imported):
@@ -96,7 +96,7 @@ target_variables <- target_variables %>%
               filter(food_item == "Rice (imported)",
                      consumed == "Yes") %>% 
               # Create a column in analysis_df for these individuals
-              select("hhid", "consumed") %>%
+              dplyr::select("hhid", "consumed") %>%
               rename("rice_imported" = "consumed"),
             by = "hhid") %>% 
   # Maize flour: 
@@ -104,7 +104,7 @@ target_variables <- target_variables %>%
               filter(food_item == "Maize flour",
                      consumed == "Yes") %>% 
               # Create a column in analysis_df for these individuals
-              select("hhid", "consumed") %>%
+              dplyr::select("hhid", "consumed") %>%
               rename("maize_flour" = "consumed"),
             by = "hhid") %>% 
   # Wheat flour: 
@@ -112,7 +112,7 @@ target_variables <- target_variables %>%
               filter(food_item == "Wheat flour",
                      consumed == "Yes") %>% 
               # Create a column in analysis_df for these individuals
-              select("hhid", "consumed") %>%
+              dplyr::select("hhid", "consumed") %>%
               rename("wheat_flour" = "consumed"),
             by = "hhid") %>% 
   # Bread: 
@@ -120,7 +120,7 @@ target_variables <- target_variables %>%
               filter(food_item == "Bread",
                      consumed == "Yes") %>% 
               # Create a column in analysis_df for these individuals
-              select("hhid", "consumed") %>% 
+              dplyr::select("hhid", "consumed") %>% 
               rename("bread" = "consumed"), 
             by = "hhid") %>% 
   # Cake: 
@@ -128,7 +128,7 @@ target_variables <- target_variables %>%
               filter(food_item == "Cake",
                      consumed == "Yes") %>% 
               # Create a column in analysis_df for these individuals
-              select("hhid", "consumed") %>% 
+              dplyr::select("hhid", "consumed") %>% 
               rename("cake" = "consumed"), 
             by = "hhid") %>% 
   # Buns/Pofpof/Donuts: 
@@ -136,7 +136,7 @@ target_variables <- target_variables %>%
               filter(food_item == "Buns/Pofpof/Donuts",
                      consumed == "Yes") %>% 
               # Create a column in analysis_df for these individuals
-              select("hhid", "consumed") %>% 
+              dplyr::select("hhid", "consumed") %>% 
               rename("buns_pofpof_donuts" = "consumed"), 
             by = "hhid") %>% 
   # Biscuits: 
@@ -144,7 +144,7 @@ target_variables <- target_variables %>%
               filter(food_item == "Biscuits",
                      consumed == "Yes") %>% 
               # Create a column in analysis_df for these individuals
-              select("hhid", "consumed") %>% 
+              dplyr::select("hhid", "consumed") %>% 
               rename("biscuits" = "consumed"), 
             by = "hhid") 
 
@@ -188,7 +188,7 @@ target_variables$wheat_flour <- ifelse(target_variables$bread == "Yes" |
 # imported rice, maize flour, wheat flour.
 
 target_variables <- target_variables %>% 
-  select(-bread, -cake, -buns_pofpof_donuts, -biscuits)
+  dplyr::select(-bread, -cake, -buns_pofpof_donuts, -biscuits)
 
 #-------------------------------------------------------------------------------
 

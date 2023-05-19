@@ -2,7 +2,7 @@
 #################### SCRIPT FOR MAPPING OF TARGET VARIABLES ####################
 ################################################################################
 
-rq_packages <- c("tidyverse", "sf", "tmap", "readr", "rmapshaper")
+rq_packages <- c("tidyverse", "sf", "tmap", "readr", "rmapshaper", "raster")
 
 installed_packages <- rq_packages %in% rownames(installed.packages())
 if (any(installed_packages == FALSE)) {
@@ -46,12 +46,15 @@ nigeria_1$shapeName <- ifelse(nigeria_1$shapeName == "abuja federal capital terr
 # Rename "shapeName" column as "state":
 names(nigeria_1)[names(nigeria_1) == "shapeName"] <- "state"
 
+# In nigeria_2 df, rename the "shapeName" column to lga: 
+names(nigeria_2)[names(nigeria_2) == "shapeName"] <- "lga"
+
 #-------------------------------------------------------------------------------
 
 # Extract location data for each household:
 
 cover <- read_csv("NLSS_data/Household/secta_cover.csv")
-household_locations <- cover %>% select("hhid", "zone", "state", "lga", "sector")
+household_locations <- cover %>% dplyr::select("hhid", "zone", "state", "lga", "sector")
 
 # Read in data dictionaries for zone, state and lga: 
 zone_dictionary <- read_csv("NLSS_data/data_dictionary/zone.csv")
@@ -59,9 +62,9 @@ state_dictionary <- read_csv("NLSS_data/data_dictionary/state.csv")
 lga_dictionary <- read_csv("NLSS_data/data_dictionary/lga.csv")
 
 # Select only the relevant columns:
-zone_dictionary <- zone_dictionary %>% select("Value", "Category")
-state_dictionary <- state_dictionary %>% select("Value", "Category")
-lga_dictionary <- lga_dictionary %>% select("Value", "Category")
+zone_dictionary <- zone_dictionary %>% dplyr::select("Value", "Category")
+state_dictionary <- state_dictionary %>% dplyr::select("Value", "Category")
+lga_dictionary <- lga_dictionary %>% dplyr::select("Value", "Category")
 
 # Remove the numbering from the category columns: 
 zone_dictionary$Category <- gsub("^\\d+\\.\\s+", "", zone_dictionary$Category)
@@ -82,7 +85,7 @@ household_locations <- household_locations %>% mutate(sector = dplyr::case_when(
 household_locations <- merge(household_locations, zone_dictionary, 
                              by.x = "zone", by.y = "Value", all.x = T)
 # Rename columns:
-household_locations <- household_locations %>% select(-zone)
+household_locations <- household_locations %>% dplyr::select(-zone)
 names(household_locations)[names(household_locations) == "Category"] <- "zone"
 
 # STATE: 
@@ -90,7 +93,7 @@ names(household_locations)[names(household_locations) == "Category"] <- "zone"
 household_locations <- merge(household_locations, state_dictionary, 
                              by.x = "state", by.y = "Value", all.x = T)
 # Rename columns:
-household_locations <- household_locations %>% select(-state)
+household_locations <- household_locations %>% dplyr::select(-state)
 names(household_locations)[names(household_locations) == "Category"] <- "state"
 
 # LGA: 
@@ -98,7 +101,7 @@ names(household_locations)[names(household_locations) == "Category"] <- "state"
 household_locations <- merge(household_locations, lga_dictionary, 
                              by.x = "lga", by.y = "Value", all.x = T)
 # Rename columns:
-household_locations <- household_locations %>% select(-lga)
+household_locations <- household_locations %>% dplyr::select(-lga)
 names(household_locations)[names(household_locations) == "Category"] <- "lga"
 
 # Remove dictionary dataframes as these are no longer required: 
@@ -108,6 +111,15 @@ rm(list = c("zone_dictionary", "state_dictionary", "lga_dictionary"))
 household_locations$zone <- tolower(household_locations$zone)
 household_locations$state <- tolower(household_locations$state)
 household_locations$lga <- tolower(household_locations$lga)
+
+# There appear to be trailing spaces in these columns, remove these to avoid issues when linking: 
+household_locations$zone <- str_squish(household_locations$zone)
+household_locations$state <- str_squish(household_locations$state)
+household_locations$lga <- str_squish(household_locations$lga)
+
+# Apply the same function to the columns in the shapefiles: 
+nigeria_1$state <- str_squish(nigeria_1$state)
+nigeria_2$lga <- str_squish(nigeria_2$lga)
 
 #-------------------------------------------------------------------------------
 
@@ -132,7 +144,8 @@ reach_state <- locations_targets %>%
 
 #-------------------------------------------------------------------------------
 
-# Join reach_state to nigeria_1 
-class(nigeria_1)
-class(reach_state)
+# Merge reach to the shapefile:
+nigeria1_targets <- sp::merge(nigeria_1, reach_state, by = "state")
 
+# Save as a new shapefile: 
+# st_write(nigeria1_targets, "map_data/outputs/nigeria1_targets.shp")

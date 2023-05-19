@@ -264,7 +264,12 @@ colour_palette <- ghibli_palette("PonyoMedium", n = 4)
 
 ggplot(grain_consumption, aes(x = reorder(grain, -percentage_consumed), 
                               y = percentage_consumed, fill = grain)) + 
-  geom_col(show.legend = F) + labs(x = "Grain", y = "% of Households") 
+  geom_col(show.legend = F) + labs(x = "Grain", y = "% of Households") +
  scale_fill_manual(values = colour_palette) + theme_pander()
+
+# Remove objects that are not required further: 
+rm(list = c("cover", "food_consumption", "grain_consumption", "maizef_consumption", 
+            "riceimp_consumption", "riceloc_consumption", "wheatf_consumption",
+            "colour_palette", "grain", "percentage_consumed"))
 
 #-------------------------------------------------------------------------------
