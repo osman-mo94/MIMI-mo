@@ -226,3 +226,4 @@ ggplot(grain_consumption, aes(x = reorder(grain, -percentage_consumed),
 # Save the plot:
 # ggsave("figures/grain_consumption.png", width = 10, height = 6, dpi = 800)
 
+# Comment
