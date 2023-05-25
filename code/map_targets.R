@@ -307,9 +307,8 @@ setdiff(reach_lga$lga, nigeria_2$lga)
 #-------------------------------------------------------------------------------
 
 # Merge reach to the shapefiles:
-nigeria1_targets <- sp::merge(nigeria_1, reach_state, by = "state")
-
-nigeria2_targets <- sp::merge(nigeria_2, reach_lga, by = "lga")
+nigeria1_targets <- dplyr::left_join(nigeria_1, reach_state, by = "state")
+nigeria2_targets <- dplyr::left_join(nigeria_2, reach_lga, by = "lga")
 
 # Save as new shapefiles: 
 # st_write(nigeria1_targets, "map_data/outputs/nigeria1_targets.shp")
