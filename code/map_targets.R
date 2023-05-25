@@ -311,6 +311,7 @@ nigeria1_targets <- sp::merge(nigeria_1, reach_state, by = "state")
 
 nigeria2_targets <- sp::merge(nigeria_2, reach_lga, by = "lga")
 
-
-# Save as a new shapefile: 
+# Save as new shapefiles: 
 # st_write(nigeria1_targets, "map_data/outputs/nigeria1_targets.shp")
+# st_write(nigeria2_targets, "map_data/outputs/nigeria2_targets.shp")
+
