@@ -239,12 +239,12 @@ nigeria_2$lga[nigeria_2$lga == "tambuwal"] <- "tambuwai"
 nigeria_2$lga[nigeria_2$lga == "abi"] <- "ugep south abi"
 nigeria_2$lga[nigeria_2$lga == "uhunmwonde"] <- "uhunmuonde"
 nigeria_2$lga[nigeria_2$lga == "ukwuani"] <- "ukwani"
-nigeria_2$lga[nigeria_2$lga == "umunneochi"] <- "umu nneochi"
+nigeria_2$lga[nigeria_2$lga == "umu nneochi"] <- "umunneochi"
 nigeria_2$lga[nigeria_2$lga == "yabo"] <- "yabo bodingo"
 nigeria_2$lga[nigeria_2$lga == "yakurr"] <- "yakurr ugep north"
 nigeria_2$lga[nigeria_2$lga == "yala"] <- "yalla"
 nigeria_2$lga[nigeria_2$lga == "yamaltu/deba"] <- "yamaltu deba"
-nigeria_2$lga[nigeria_2$lga == "yankwashi"] <- "yan kawashi"
+nigeria_2$lga[nigeria_2$lga == "yankwashi"] <- "yan kwashi"
 nigeria_2$lga[nigeria_2$lga == "yenegoa"] <- "yenagoa"
 
 # There are 2 lga's with the name "bassa" in nigeria_2, identify which is which:
@@ -301,14 +301,16 @@ plot(nigeria_2$geometry[411], add = T, col = "#0000ff")
 nigeria_2$lga[81] <- "surulere (oyo)"
 nigeria_2$lga[411] <- "surulere (lagos)"
 
+# See which elements are in reach_lga but not in nigeria_2$lga:
+setdiff(reach_lga$lga, nigeria_2$lga)
+
 #-------------------------------------------------------------------------------
 
 # Merge reach to the shapefiles:
 nigeria1_targets <- sp::merge(nigeria_1, reach_state, by = "state")
 
-nigeria2_targets <- sp::merge(nigeria_2, reach_lga, by = "lga") 
-# Many of the lga's have failed to join 
-View(nigeria2_targets) # 6 LGA's have not joined
+nigeria2_targets <- sp::merge(nigeria_2, reach_lga, by = "lga")
+
 
 # Save as a new shapefile: 
 # st_write(nigeria1_targets, "map_data/outputs/nigeria1_targets.shp")
