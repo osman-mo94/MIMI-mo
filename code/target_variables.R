@@ -55,6 +55,9 @@ food_consumption <- food_consumption %>%
          conversion_factor = s06bq02_cvn,
          quantity_purchased = s06bq03)
 
+# Calculate the quantity consumed in standard units (kg/L)
+food_consumption$quantity_kg_L <- food_consumption$quantity_consumed * food_consumption$conversion_factor
+
 # Create a column if at least some of the food item was purchased (i.e. quantity > 0, and not NA):
 food_consumption$food_purchased <- ifelse(food_consumption$quantity_purchased > 0, 
                                           "Yes", "No")
@@ -77,8 +80,9 @@ target_variables <- target_variables %>%
                      consumed == "Yes",
                      food_purchased == "Yes") %>% 
               # Create a column in analysis_df for these individuals
-              dplyr::select("hhid", "consumed") %>%
-              rename("rice_local" = "consumed"),
+              dplyr::select("hhid", "consumed", "quantity_kg_L") %>%
+              rename("rice_local" = "consumed",
+                     "rice_local_kg" = "quantity_kg_L"),
             by = "hhid") %>% 
   # Rice (imported):
   left_join(food_consumption %>% 
@@ -86,8 +90,9 @@ target_variables <- target_variables %>%
                      consumed == "Yes",
                      food_purchased == "Yes") %>% 
               # Create a column in analysis_df for these individuals
-              dplyr::select("hhid", "consumed") %>%
-              rename("rice_imported" = "consumed"),
+              dplyr::select("hhid", "consumed", "quantity_kg_L") %>%
+              rename("rice_imported" = "consumed",
+                     "rice_imported_kg" = "quantity_kg_L"),
             by = "hhid") %>% 
   # Maize flour: 
   left_join(food_consumption %>% 
@@ -95,8 +100,9 @@ target_variables <- target_variables %>%
                      consumed == "Yes",
                      food_purchased == "Yes") %>% 
               # Create a column in analysis_df for these individuals
-              dplyr::select("hhid", "consumed") %>%
-              rename("maize_flour" = "consumed"),
+              dplyr::select("hhid", "consumed", "quantity_kg_L") %>%
+              rename("maize_flour" = "consumed",
+                     "maize_flour_kg" = "quantity_kg_L"),
             by = "hhid") %>% 
   # Wheat flour: 
   left_join(food_consumption %>% 
@@ -104,8 +110,9 @@ target_variables <- target_variables %>%
                      consumed == "Yes",
                      food_purchased == "Yes") %>% 
               # Create a column in analysis_df for these individuals
-              dplyr::select("hhid", "consumed") %>%
-              rename("wheat_flour" = "consumed"),
+              dplyr::select("hhid", "consumed", "quantity_kg_L") %>%
+              rename("wheat_flour" = "consumed",
+                     "wheat_flour_kg" = "quantity_kg_L"),
             by = "hhid") %>% 
 
 # Baked goods do not necessarily need to have been purchased, as they could have been made using purchased flour:    
@@ -115,32 +122,36 @@ target_variables <- target_variables %>%
               filter(food_item == "Bread",
                      consumed == "Yes") %>% 
               # Create a column in analysis_df for these individuals
-              dplyr::select("hhid", "consumed") %>% 
-              rename("bread" = "consumed"), 
+              dplyr::select("hhid", "consumed", "quantity_kg_L") %>% 
+              rename("bread" = "consumed",
+                     "bread_kg" = "quantity_kg_L"), 
             by = "hhid") %>% 
   # Cake: 
   left_join(food_consumption %>% 
               filter(food_item == "Cake",
                      consumed == "Yes") %>% 
               # Create a column in analysis_df for these individuals
-              dplyr::select("hhid", "consumed") %>% 
-              rename("cake" = "consumed"), 
+              dplyr::select("hhid", "consumed", "quantity_kg_L") %>% 
+              rename("cake" = "consumed",
+                     "cake_kg" = "quantity_kg_L"), 
             by = "hhid") %>% 
   # Buns/Pofpof/Donuts: 
   left_join(food_consumption %>% 
               filter(food_item == "Buns/Pofpof/Donuts",
                      consumed == "Yes") %>% 
               # Create a column in analysis_df for these individuals
-              dplyr::select("hhid", "consumed") %>% 
-              rename("buns_pofpof_donuts" = "consumed"), 
+              dplyr::select("hhid", "consumed", "quantity_kg_L") %>% 
+              rename("buns_pofpof_donuts" = "consumed",
+                     "buns_pofpof_donuts_kg" = "quantity_kg_L"), 
             by = "hhid") %>% 
   # Biscuits: 
   left_join(food_consumption %>% 
               filter(food_item == "Biscuits",
                      consumed == "Yes") %>% 
               # Create a column in analysis_df for these individuals
-              dplyr::select("hhid", "consumed") %>% 
-              rename("biscuits" = "consumed"), 
+              dplyr::select("hhid", "consumed", "quantity_kg_L") %>% 
+              rename("biscuits" = "consumed",
+                     "biscuits_kg" = "quantity_kg_L"), 
             by = "hhid") 
 
 
@@ -182,8 +193,8 @@ target_variables$wheat_flour <- ifelse(target_variables$bread == "Yes" |
 # Now remove the other columns to include only the 4 staple grains: local rice, 
 # imported rice, maize flour, wheat flour.
 
-target_variables <- target_variables %>% 
-  dplyr::select(-bread, -cake, -buns_pofpof_donuts, -biscuits)
+# target_variables <- target_variables %>% 
+#   dplyr::select(-bread, -cake, -buns_pofpof_donuts, -biscuits)
 
 #-------------------------------------------------------------------------------
 
@@ -226,4 +237,17 @@ ggplot(grain_consumption, aes(x = reorder(grain, -percentage_consumed),
 # Save the plot:
 # ggsave("figures/grain_consumption.png", width = 10, height = 6, dpi = 800)
 
-# Comment
+#-------------------------------------------------------------------------------
+
+# Now, in order to calculate coverage and effective coverage, I will need
+# nutrient intake data for each household.
+
+# Read in csv file containing total base case apparent nutrient intake for each household: 
+nutrient_intake <- read_csv("nutrient_data/nga18_ai_basecase_MO_v1.csv")
+View(nutrient_intake)
+
+# Merge nutrient_intake to target_variables:
+target_variables <- target_variables %>% 
+  left_join(nutrient_intake, by = "hhid")
+
+View(target_variables)
