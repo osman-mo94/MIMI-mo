@@ -4,7 +4,7 @@
 
 # Install and load required packages:
 rq_packages <- c("readr", "tidyverse", "ggplot2", "janitor", "knitr",
-                 "wesanderson", "ghibli", "ggthemes")
+                 "wesanderson", "ghibli", "ggthemes", "table1")
 
 installed_packages <- rq_packages %in% rownames(installed.packages())
 if (any(installed_packages == FALSE)) {
@@ -23,7 +23,8 @@ food_consumption <- read_csv("NLSS_data/Household/sect6b_food_cons.csv")
 
 #-------------------------------------------------------------------------------
 
-# FOOD CONSUMPTION:
+# Extract data on staple grains from the food consumption module of NLSS: 
+
 dim(food_consumption) # 2,454,987 rows and 26 columns
 colnames(food_consumption)
 
@@ -55,6 +56,9 @@ food_consumption <- food_consumption %>%
          conversion_factor = s06bq02_cvn,
          quantity_purchased = s06bq03)
 
+# Calculate the quantity consumed in standard units (kg/L)
+food_consumption$quantity_kg_L <- food_consumption$quantity_consumed * food_consumption$conversion_factor
+
 # Create a column if at least some of the food item was purchased (i.e. quantity > 0, and not NA):
 food_consumption$food_purchased <- ifelse(food_consumption$quantity_purchased > 0, 
                                           "Yes", "No")
@@ -77,8 +81,9 @@ target_variables <- target_variables %>%
                      consumed == "Yes",
                      food_purchased == "Yes") %>% 
               # Create a column in analysis_df for these individuals
-              dplyr::select("hhid", "consumed") %>%
-              rename("rice_local" = "consumed"),
+              dplyr::select("hhid", "consumed", "quantity_kg_L") %>%
+              rename("rice_local" = "consumed",
+                     "rice_local_kg" = "quantity_kg_L"),
             by = "hhid") %>% 
   # Rice (imported):
   left_join(food_consumption %>% 
@@ -86,8 +91,9 @@ target_variables <- target_variables %>%
                      consumed == "Yes",
                      food_purchased == "Yes") %>% 
               # Create a column in analysis_df for these individuals
-              dplyr::select("hhid", "consumed") %>%
-              rename("rice_imported" = "consumed"),
+              dplyr::select("hhid", "consumed", "quantity_kg_L") %>%
+              rename("rice_imported" = "consumed",
+                     "rice_imported_kg" = "quantity_kg_L"),
             by = "hhid") %>% 
   # Maize flour: 
   left_join(food_consumption %>% 
@@ -95,8 +101,9 @@ target_variables <- target_variables %>%
                      consumed == "Yes",
                      food_purchased == "Yes") %>% 
               # Create a column in analysis_df for these individuals
-              dplyr::select("hhid", "consumed") %>%
-              rename("maize_flour" = "consumed"),
+              dplyr::select("hhid", "consumed", "quantity_kg_L") %>%
+              rename("maize_flour" = "consumed",
+                     "maize_flour_kg" = "quantity_kg_L"),
             by = "hhid") %>% 
   # Wheat flour: 
   left_join(food_consumption %>% 
@@ -104,8 +111,9 @@ target_variables <- target_variables %>%
                      consumed == "Yes",
                      food_purchased == "Yes") %>% 
               # Create a column in analysis_df for these individuals
-              dplyr::select("hhid", "consumed") %>%
-              rename("wheat_flour" = "consumed"),
+              dplyr::select("hhid", "consumed", "quantity_kg_L") %>%
+              rename("wheat_flour" = "consumed",
+                     "wheat_flour_kg" = "quantity_kg_L"),
             by = "hhid") %>% 
 
 # Baked goods do not necessarily need to have been purchased, as they could have been made using purchased flour:    
@@ -115,32 +123,36 @@ target_variables <- target_variables %>%
               filter(food_item == "Bread",
                      consumed == "Yes") %>% 
               # Create a column in analysis_df for these individuals
-              dplyr::select("hhid", "consumed") %>% 
-              rename("bread" = "consumed"), 
+              dplyr::select("hhid", "consumed", "quantity_kg_L") %>% 
+              rename("bread" = "consumed",
+                     "bread_kg" = "quantity_kg_L"), 
             by = "hhid") %>% 
   # Cake: 
   left_join(food_consumption %>% 
               filter(food_item == "Cake",
                      consumed == "Yes") %>% 
               # Create a column in analysis_df for these individuals
-              dplyr::select("hhid", "consumed") %>% 
-              rename("cake" = "consumed"), 
+              dplyr::select("hhid", "consumed", "quantity_kg_L") %>% 
+              rename("cake" = "consumed",
+                     "cake_kg" = "quantity_kg_L"), 
             by = "hhid") %>% 
   # Buns/Pofpof/Donuts: 
   left_join(food_consumption %>% 
               filter(food_item == "Buns/Pofpof/Donuts",
                      consumed == "Yes") %>% 
               # Create a column in analysis_df for these individuals
-              dplyr::select("hhid", "consumed") %>% 
-              rename("buns_pofpof_donuts" = "consumed"), 
+              dplyr::select("hhid", "consumed", "quantity_kg_L") %>% 
+              rename("buns_pofpof_donuts" = "consumed",
+                     "buns_pofpof_donuts_kg" = "quantity_kg_L"), 
             by = "hhid") %>% 
   # Biscuits: 
   left_join(food_consumption %>% 
               filter(food_item == "Biscuits",
                      consumed == "Yes") %>% 
               # Create a column in analysis_df for these individuals
-              dplyr::select("hhid", "consumed") %>% 
-              rename("biscuits" = "consumed"), 
+              dplyr::select("hhid", "consumed", "quantity_kg_L") %>% 
+              rename("biscuits" = "consumed",
+                     "biscuits_kg" = "quantity_kg_L"), 
             by = "hhid") 
 
 
@@ -169,61 +181,219 @@ target_variables$buns_pofpof_donuts <- ifelse(is.na(target_variables$buns_pofpof
 target_variables$biscuits <- ifelse(is.na(target_variables$biscuits), "No", 
                                target_variables$biscuits)
 
+# Create a variable for all rice consumption (both local and imported):
+target_variables$rice_combined <- ifelse(target_variables$rice_local == "Yes" |
+                                           target_variables$rice_imported == "Yes",
+                                         "Yes", "No")
+
+# Calculate quantity of all rice consumed (both local and imported): 
+target_variables$rice_combined_kg <- ifelse(is.na(target_variables$rice_local_kg), 
+                                            0, target_variables$rice_local_kg) +
+                                     ifelse(is.na(target_variables$rice_imported_kg), 
+                                            0, target_variables$rice_imported_kg)
+
 # Assuming that bread, cake, buns/pofpof/donuts and biscuits all contain wheat flour, 
 # consolidate these into 1 wheat_flour column, that will indicate "Yes" if any of
 # the food items are consumed:
 
 target_variables$wheat_flour <- ifelse(target_variables$bread == "Yes" | 
-                                    target_variables$cake == "Yes" | 
-                                    target_variables$buns_pofpof_donuts == "Yes" | 
-                                    target_variables$biscuits == "Yes", "Yes", 
-                                  target_variables$wheat_flour)
+                                        target_variables$cake == "Yes" | 
+                                        target_variables$buns_pofpof_donuts == "Yes" | 
+                                        target_variables$biscuits == "Yes", 
+                                       "Yes", target_variables$wheat_flour)
 
 # Now remove the other columns to include only the 4 staple grains: local rice, 
 # imported rice, maize flour, wheat flour.
 
-target_variables <- target_variables %>% 
-  dplyr::select(-bread, -cake, -buns_pofpof_donuts, -biscuits)
+# target_variables <- target_variables %>% 
+#   dplyr::select(-bread, -cake, -buns_pofpof_donuts, -biscuits)
 
 #-------------------------------------------------------------------------------
 
-# Summary statistics for intake of staple grains:
-View(target_variables)
+# Now, in order to calculate coverage and effective coverage, I will need
+# nutrient intake data for each household.
 
-riceloc_consumption <- target_variables %>% count(rice_local) %>% 
+# Read in csv file containing total base case apparent nutrient intake for each household: 
+nutrient_intake <- read_csv("nutrient_data/nga18_ai_basecase_MO_v1.csv")
+
+# Create a column to indicate whether or not there is adequate intake of each micronutrient:
+nutrient_intake$vitamina_adequate <- ifelse(nutrient_intake$vitamina_in_rae_in_mcg_ai >= 490, 
+                                             "Adequate", "Inadequate")
+
+nutrient_intake$thiamine_adequate <- ifelse(nutrient_intake$thiamine_in_mg_ai >= 0.9, 
+                                             "Adequate", "Inadequate")
+
+nutrient_intake$riboflavin_adequate <- ifelse(nutrient_intake$riboflavin_in_mg_ai >= 1.3, 
+                                               "Adequate", "Inadequate")
+
+nutrient_intake$niacin_adequate <- ifelse(nutrient_intake$niacin_in_mg_ai >= 11, 
+                                           "Adequate", "Inadequate")
+
+nutrient_intake$vitaminb6_adequate <- ifelse(nutrient_intake$vitaminb6_in_mg_ai >= 1.3, 
+                                              "Adequate", "Inadequate")
+
+nutrient_intake$folate_adequate <- ifelse(nutrient_intake$folate_in_mcg_ai >= 250, 
+                                          "Adequate", "Inadequate")
+
+nutrient_intake$vitaminb12_adequate <- ifelse(nutrient_intake$vitaminb12_in_mcg_ai >= 2, 
+                                              "Adequate", "Inadequate")
+
+nutrient_intake$fe_adequate <- ifelse(nutrient_intake$fe_in_mg_ai >= 22.4, 
+                                      "Adequate", "Inadequate")
+
+nutrient_intake$zn_adequate <- ifelse(nutrient_intake$zn_in_mg_ai >= 10.2,
+                                      "Adequate", "Inadequate")
+
+# Merge nutrient_intake to target_variables:
+target_variables <- target_variables %>% 
+  left_join(nutrient_intake %>% dplyr::select("vitamina_adequate", "thiamine_adequate",
+                                              "riboflavin_adequate", "niacin_adequate",
+                                              "vitaminb6_adequate","folate_adequate",
+                                              "vitaminb12_adequate", "fe_adequate", 
+                                              "zn_adequate", "hhid")
+            , by = "hhid")
+
+# Create a summary table to show number of households with adequate intake of each micronutrient:
+
+label(target_variables$vitamina_adequate) <- "Vitamin A"
+label(target_variables$thiamine_adequate) <- "Thiamine"
+label(target_variables$riboflavin_adequate) <- "Riboflavin"
+label(target_variables$niacin_adequate) <- "Niacin"
+label(target_variables$vitaminb6_adequate) <- "Vitamin B6"
+label(target_variables$folate_adequate) <- "Folate"
+label(target_variables$vitaminb12_adequate) <- "Vitamin B12"
+label(target_variables$fe_adequate) <- "Iron"
+label(target_variables$zn_adequate) <- "Zinc"
+
+table1(~ vitamina_adequate + thiamine_adequate + riboflavin_adequate +niacin_adequate + 
+       vitaminb6_adequate + folate_adequate + vitaminb12_adequate + fe_adequate + zn_adequate,
+       data = target_variables)
+
+# Household risk of MND defined as inadequate intake of 2 or more of:
+# - Vitamin A
+# - Folate
+# - Zinc
+# - Iron
+# - Zinc
+
+# For each household, count the number of these micronutrients for which intake is inadequate:
+target_variables <- target_variables %>% 
+  mutate(n_inadequate = rowSums(dplyr::select(., vitamina_adequate, folate_adequate,
+                                              vitaminb12_adequate,fe_adequate, 
+                                              zn_adequate) == "Inadequate"))
+
+# Classify the household at risk of MND if >=2 inadequate: 
+target_variables$risk_MND <- ifelse(target_variables$n_inadequate >= 2, 
+                                    "Yes", "No")
+
+#-------------------------------------------------------------------------------
+
+# Read in roster data - this gives a roster of individuals living in each household: 
+roster <- read_csv("NLSS_data/Household/sect1_roster.csv")
+
+# Count number of individuals living in each household:
+roster <- roster %>% 
+  group_by(hhid) %>% 
+  summarise(n = n())
+
+# Merge this data to the target_variables dataframe: 
+target_variables <- target_variables %>% 
+  left_join(roster, by = "hhid") %>% 
+  rename("n_residents" = "n")
+
+#-------------------------------------------------------------------------------
+
+# Now create visualisations for REACH, COVERAGE and EFFECTIVE COVERAGE:
+
+#-------------------------------------------------------------------------------
+
+# REACH
+
+# Reach is defined as: 
+# n of households with access to a fortification vehicle / total n of households
+
+riceloc_reach <- target_variables %>% count(rice_local) %>% 
   mutate(percentage = round(n/sum(n) * 100, digits = 1)) 
 
-riceimp_consumption <- target_variables %>% count(rice_imported) %>% 
+riceimp_reach <- target_variables %>% count(rice_imported) %>% 
   mutate(percentage = round(n/sum(n) * 100, digits = 1)) 
 
-maizef_consumption <- target_variables %>% count(maize_flour) %>% 
+ricecomb_reach <- target_variables %>% count(rice_combined) %>% 
+  mutate(percentage = round(n/sum(n) * 100, digits = 1))
+
+maizef_reach <- target_variables %>% count(maize_flour) %>% 
   mutate(percentage = round(n/sum(n) * 100, digits = 1)) 
 
-wheatf_consumption <- target_variables %>% count(wheat_flour) %>% 
+wheatf_reach <- target_variables %>% count(wheat_flour) %>% 
   mutate(percentage = round(n/sum(n) * 100, digits = 1)) 
 
 
 # Visualise percentage of households consuming each food in a barplot:
 
-grain <- c("Rice (local)", "Rice (imported)", "Maize flour", "Wheat flour")
+grain <- c("Rice (local)", "Rice (imported)", "Rice (combined)", "Maize flour", "Wheat flour")
 
-percentage_consumed <- c(riceloc_consumption[2,3], riceimp_consumption[2,3], 
-                         maizef_consumption[2,3], wheatf_consumption[2,3])
+reach <- c(riceloc_reach[2,3], riceimp_reach[2,3], ricecomb_reach[2,3], 
+           maizef_reach[2,3], wheatf_reach[2,3])
 
-percentage_consumed <- as.double(percentage_consumed)
+reach <- as.double(reach)
 
-grain_consumption <- data.frame(grain, percentage_consumed) %>% 
-  arrange(desc(percentage_consumed))
+# Create data-frame to show percentage of households with access to each fortification vehicle: 
+grain_reach <- data.frame(grain, reach) %>% 
+  arrange(desc(reach))
 
-colour_palette <- ghibli_palette("PonyoMedium", n = 4)
+colour_palette <- ghibli_palette("PonyoMedium", n = 5)
 
-ggplot(grain_consumption, aes(x = reorder(grain, -percentage_consumed), 
-                              y = percentage_consumed, fill = grain)) + 
+ggplot(grain_reach, aes(x = reorder(grain, -reach), 
+                              y = reach, fill = grain)) + 
   geom_col(show.legend = F) + labs(x = "Grain", y = "% of Households") +
-  ggtitle("Percentage of households with access to each fortification vehicle in Nigeria") +
+  ggtitle("Reach of each fortification vehicle in Nigeria") +
   scale_fill_manual(values = colour_palette) + theme_pander()
 
 # Save the plot:
-# ggsave("figures/grain_consumption.png", width = 10, height = 6, dpi = 800)
+# ggsave("figures/reach.png", width = 10, height = 6, dpi = 800)
 
-# Comment
+#-------------------------------------------------------------------------------
+
+# COVERAGE
+
+# Coverage is defined as:
+# n of households at risk of MND with access / total n of households at risk of MND:
+
+riceloc_coverage <- target_variables %>% filter(risk_MND == "Yes") %>% 
+  count(rice_local) %>% mutate(precentage = round(n/sum(n) * 100, digits = 1))
+
+riceimp_coverage <- target_variables %>% filter(risk_MND == "Yes") %>% 
+  count(rice_imported) %>% mutate(precentage = round(n/sum(n) * 100, digits = 1))
+
+ricecomb_coverage <- target_variables %>% filter(risk_MND == "Yes") %>% 
+  count(rice_combined) %>% mutate(precentage = round(n/sum(n) * 100, digits = 1))
+
+maizef_coverage <- target_variables %>% filter(risk_MND == "Yes") %>% 
+  count(maize_flour) %>% mutate(precentage = round(n/sum(n) * 100, digits = 1))
+
+wheatf_coverage <- target_variables %>% filter(risk_MND == "Yes") %>% 
+  count(wheat_flour) %>% mutate(precentage = round(n/sum(n) * 100, digits = 1))
+
+coverage <- c(riceloc_coverage[2,3], riceimp_coverage[2,3], ricecomb_coverage[2,3], 
+           maizef_coverage[2,3], wheatf_coverage[2,3])
+
+coverage <- as.double(coverage)
+
+grain_coverage <- data.frame(grain, coverage) %>% 
+  arrange(desc(coverage))
+
+colour_palette <- ghibli_palette("PonyoMedium", n = 5)
+
+ggplot(grain_coverage, aes(x = reorder(grain, -coverage), 
+                        y = coverage, fill = grain)) + geom_col(show.legend = F) + 
+  labs(x = "Grain", 
+  y = "% of Households at risk of MND with access to fortification vehicle") +
+  ggtitle("Coverage of each fortification vehicle in Nigeria") +
+  scale_fill_manual(values = colour_palette) + theme_pander()
+
+# Save the plot:
+# ggsave("figures/coverage.png", width = 10, height = 6, dpi = 800)
+
+#-------------------------------------------------------------------------------
+
+
