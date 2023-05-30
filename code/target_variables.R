@@ -390,3 +390,10 @@ ggplot(grain_coverage, aes(x = reorder(grain, -coverage),
   y = "% of Households at risk of MND with access to fortification vehicle") +
   ggtitle("Coverage of each fortification vehicle in Nigeria") +
   scale_fill_manual(values = colour_palette) + theme_pander()
+
+# Save the plot:
+# ggsave("figures/coverage.png", width = 10, height = 6, dpi = 800)
+
+#-------------------------------------------------------------------------------
+
+
