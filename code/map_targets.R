@@ -146,6 +146,7 @@ reach_state <- locations_targets %>%
   group_by(state) %>% 
   summarise(reach_rice_local = sum(rice_local == "Yes") / n(),
             reach_rice_imported = sum(rice_imported == "Yes") / n(),
+            reach_rice_combined = sum(rice_combined == "Yes") / n(),
             reach_wheatf = sum(wheat_flour == "Yes") / n(),
             reach_maizef = sum(maize_flour == "Yes") / n())
 
@@ -155,16 +156,17 @@ reach_lga <- locations_targets %>%
   group_by(lga) %>% 
   summarise(reach_rice_local = sum(rice_local == "Yes") / n(),
             reach_rice_imported = sum(rice_imported == "Yes") / n(),
+            reach_rice_combined = sum(rice_combined == "Yes") / n(),
             reach_wheatf = sum(wheat_flour == "Yes") / n(),
             reach_maizef = sum(maize_flour == "Yes") / n())
 
 n_distinct(household_locations$lga) 
 # Note that not all LGA's are represented in the survey: Only 741/774
 
-# See elements in reach_lga that are not in nigeria_2
-setdiff(reach_lga$lga, nigeria_2$lga) # There are 92 of these elements
+# See lga's in reach_lga that do not match those in nigeria_2
+setdiff(reach_lga$lga, nigeria_2$lga) # There are 92 lga's that are named inconsistently
 
-# Rename elements in nigeria_2 to match those in reach_lga:
+# Rename lga's in nigeria_2 to match those in reach_lga:
 nigeria_2$lga[nigeria_2$lga == "abaji"] <- "abaji area council"
 nigeria_2$lga[nigeria_2$lga == "abua/odual"] <- "abua odua"
 nigeria_2$lga[nigeria_2$lga == "ado"] <- "ador"
@@ -302,15 +304,45 @@ nigeria_2$lga[81] <- "surulere (oyo)"
 nigeria_2$lga[411] <- "surulere (lagos)"
 
 # See which elements are in reach_lga but not in nigeria_2$lga:
-setdiff(reach_lga$lga, nigeria_2$lga)
+setdiff(reach_lga$lga, nigeria_2$lga) 
+# There are no outstanding differences remaining
 
 #-------------------------------------------------------------------------------
 
 # Merge reach to the shapefiles:
-nigeria1_targets <- dplyr::left_join(nigeria_1, reach_state, by = "state")
-nigeria2_targets <- dplyr::left_join(nigeria_2, reach_lga, by = "lga")
+nigeria1_reach <- dplyr::left_join(nigeria_1, reach_state, by = "state")
+nigeria2_reach <- dplyr::left_join(nigeria_2, reach_lga, by = "lga")
 
 # Save as new shapefiles: 
-# st_write(nigeria1_targets, "map_data/outputs/nigeria1_targets.shp")
-# st_write(nigeria2_targets, "map_data/outputs/nigeria2_targets.shp")
+# st_write(nigeria1_reach, "map_data/outputs/nigeria1_reach.shp")
+# st_write(nigeria2_reach, "map_data/outputs/nigeria2_reach.shp")
 
+#-------------------------------------------------------------------------------
+
+# Calculate coverage aggregated at the state level for each staple grain: 
+
+coverage_state <- locations_targets %>% 
+  filter(risk_MND == "Yes") %>% group_by(state) %>% 
+  summarise(coverage_rice_local = sum(rice_local == "Yes") / n(),
+            coverage_rice_imported = sum(rice_imported == "Yes") / n(),
+            coverage_rice_combined = sum(rice_combined == "Yes") / n(),
+            coverage_wheatf = sum(wheat_flour == "Yes") / n(),
+            coverage_maizef = sum(maize_flour == "Yes") / n())
+
+# Calculate coverage aggregated at the lga level for each staple grain: 
+
+coverage_lga <- locations_targets %>% 
+  filter(risk_MND == "Yes") %>% group_by(lga) %>% 
+  summarise(coverage_rice_local = sum(rice_local == "Yes") / n(),
+            coverage_rice_imported = sum(rice_imported == "Yes") / n(),
+            coverage_rice_combined = sum(rice_combined == "Yes") / n(),
+            coverage_wheatf = sum(wheat_flour == "Yes") / n(),
+            coverage_maizef = sum(maize_flour == "Yes") / n())
+
+# Merge coverage to the shapefiles:
+nigeria1_coverage <- dplyr::left_join(nigeria_1, coverage_state, by = "state")
+nigeria2_coverage <- dplyr::left_join(nigeria_2, coverage_lga, by = "lga")
+
+# Save as new shapefiles: 
+# st_write(nigeria1_coverage, "map_data/outputs/nigeria1_coverage.shp")
+# st_write(nigeria2_coverage, "map_data/outputs/nigeria2_coverage.shp")

@@ -202,6 +202,9 @@ target_variables$wheat_flour <- ifelse(target_variables$bread == "Yes" |
                                         target_variables$biscuits == "Yes", 
                                        "Yes", target_variables$wheat_flour)
 
+# For these food items, multiply quantity consumed by proportion of that food 
+# item that is wheat flour:
+
 # Now remove the other columns to include only the 4 staple grains: local rice, 
 # imported rice, maize flour, wheat flour.
 
