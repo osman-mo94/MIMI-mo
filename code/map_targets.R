@@ -2,7 +2,13 @@
 #################### SCRIPT FOR MAPPING OF TARGET VARIABLES ####################
 ################################################################################
 
-rq_packages <- c("tidyverse", "sf", "tmap", "readr", "rmapshaper", "raster")
+# This script creates maps for for reach and coverage target variables. I also 
+# perform some mapping of the adequacy of key micronutrients (Vitamin A, Folate,
+# Zinc, Iron and Vitamin B12)
+
+rq_packages <- c("tidyverse", "sf", "tmap", "readr", "rmapshaper", "raster",
+                 "ggplot2", "ggspatial", "cowplot", "tmaptools", "terra", 
+                 "gridExtra")
 
 installed_packages <- rq_packages %in% rownames(installed.packages())
 if (any(installed_packages == FALSE)) {
@@ -139,6 +145,8 @@ locations_targets <- household_locations %>%
             by = "hhid")
 
 #-------------------------------------------------------------------------------
+
+# REACH
 
 # Calculate reach aggregated at the state level for each grain:
 
@@ -307,8 +315,6 @@ nigeria_2$lga[411] <- "surulere (lagos)"
 setdiff(reach_lga$lga, nigeria_2$lga) 
 # There are no outstanding differences remaining
 
-#-------------------------------------------------------------------------------
-
 # Merge reach to the shapefiles:
 nigeria1_reach <- dplyr::left_join(nigeria_1, reach_state, by = "state")
 nigeria2_reach <- dplyr::left_join(nigeria_2, reach_lga, by = "lga")
@@ -317,7 +323,135 @@ nigeria2_reach <- dplyr::left_join(nigeria_2, reach_lga, by = "lga")
 # st_write(nigeria1_reach, "map_data/outputs/nigeria1_reach.shp")
 # st_write(nigeria2_reach, "map_data/outputs/nigeria2_reach.shp")
 
+# Create maps: 
+
+# ADM1
+
+breaks <- c(0, 0.000001, 0.3, 0.6, 0.8, 1)
+
+# Rice
+rice_ADM1 <- tm_shape(nigeria1_reach) + 
+  tm_fill(col = "reach_rice_combined", breaks = breaks, palette = "Blues") +
+  tm_layout(main.title = "Rice", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.7) +
+  tm_legend(show = F)
+
+rice_ADM1
+
+# Wheat flour
+wheat_ADM1 <- tm_shape(nigeria1_reach) + 
+  tm_fill(col = "reach_wheatf", breaks = breaks, palette = "Blues") +
+  tm_layout(main.title = "Wheat flour", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.7) +
+  tm_legend(show = F)
+
+wheat_ADM1
+
+# Maize flour: 
+maize_ADM1 <- tm_shape(nigeria1_reach) + 
+  tm_fill(col = "reach_maizef", breaks = breaks, palette = "Blues") +
+  tm_layout(main.title = "Maize flour", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.7) +
+  tm_legend(show = F)
+
+maize_ADM1
+
+# legend: 
+reach_legend1 <- tm_shape(nigeria1_reach) + 
+  tm_fill(col = "reach_maizef", breaks = breaks, palette = "Blues",
+          title = "Reach (% of households with access 
+to the fortification vehicle)",
+          labels = c("0", "0-30%", "30-60%", "60-80%", "80-100%"),
+          textNA = "Missing Data",
+          colorNA = "gray35") +
+  tm_layout(legend.only = T,
+            legend.position = c("center", "center"),
+            legend.width = 1,
+            legend.height = 1) +
+  tm_compass(north = 0, type = "arrow")
+
+reach_legend1
+
+
+# Integrate these mapsand legend into a single figure: 
+
+reach_ADM1 <- list(rice_ADM1, wheat_ADM1, maize_ADM1, reach_legend1)
+
+reach_ADM1 <- tmap_arrange(reach_ADM1, ncol = 2, sync = TRUE)
+
+reach_ADM1
+
+tmap_save(reach_ADM1, "figures/reach_ADM1.png", height = 5, width = 5)
+
+
+# ADM2
+
+# Rice
+rice_ADM2 <- tm_shape(nigeria2_reach) + 
+  tm_fill(col = "reach_rice_combined", breaks = breaks, palette = "Blues",
+          colorNA = "gray35") +
+  tm_layout(main.title = "Rice", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.7) +
+  tm_legend(show = F)
+
+rice_ADM2
+
+# Wheat flour
+wheat_ADM2 <- tm_shape(nigeria2_reach) + 
+  tm_fill(col = "reach_wheatf", breaks = breaks, palette = "Blues",
+          colorNA = "gray35") +
+  tm_layout(main.title = "Wheat flour", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.7) +
+  tm_legend(show = F)
+
+wheat_ADM2
+
+# Maize flour: 
+maize_ADM2 <- tm_shape(nigeria2_reach) + 
+  tm_fill(col = "reach_maizef", breaks = breaks, palette = "Blues",
+          colorNA = "gray35") +
+  tm_layout(main.title = "Maize flour", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.7) +
+  tm_legend(show = F)
+
+maize_ADM2
+
+# legend: 
+reach_legend2 <- tm_shape(nigeria2_reach) + 
+  tm_fill(col = "reach_maizef", breaks = breaks, palette = "Blues",
+          title = "Reach (% of households with access 
+to the fortification vehicle)",
+          labels = c("0", "0-30%", "30-60%", "60-80%", "80-100%"),
+          textNA = "Missing Data",
+          colorNA = "gray35") +
+  tm_layout(legend.only = T,
+            legend.position = c("center", "center"),
+            legend.width = 1,
+            legend.height = 1) +
+  tm_compass(north = 0, type = "arrow")
+
+reach_legend2
+
+
+# Integrate these mapsand legend into a single figure: 
+
+reach_ADM2 <- list(rice_ADM2, wheat_ADM2, maize_ADM2, reach_legend2)
+
+reach_ADM2 <- tmap_arrange(reach_ADM2, ncol = 2, sync = TRUE)
+
+reach_ADM2
+
+tmap_save(reach_ADM2, "figures/reach_ADM2.png", height = 5, width = 5)
+
 #-------------------------------------------------------------------------------
+
+# COVERAGE
 
 # Calculate coverage aggregated at the state level for each staple grain: 
 
@@ -346,3 +480,358 @@ nigeria2_coverage <- dplyr::left_join(nigeria_2, coverage_lga, by = "lga")
 # Save as new shapefiles: 
 # st_write(nigeria1_coverage, "map_data/outputs/nigeria1_coverage.shp")
 # st_write(nigeria2_coverage, "map_data/outputs/nigeria2_coverage.shp")
+
+# Create maps: 
+
+# ADM1
+
+breaks <- c(0, 0.000001, 0.3, 0.6, 0.8, 1)
+
+# Rice
+rice_ADM1cov <- tm_shape(nigeria1_coverage) + 
+  tm_fill(col = "coverage_rice_combined", breaks = breaks, palette = "Blues") +
+  tm_layout(main.title = "Rice", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.7) +
+  tm_legend(show = F)
+
+rice_ADM1cov
+
+# Wheat flour
+wheat_ADM1cov <- tm_shape(nigeria1_coverage) + 
+  tm_fill(col = "coverage_wheatf", breaks = breaks, palette = "Blues") +
+  tm_layout(main.title = "Wheat flour", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.7) +
+  tm_legend(show = F)
+
+wheat_ADM1cov
+
+# Maize flour: 
+maize_ADM1cov <- tm_shape(nigeria1_coverage) + 
+  tm_fill(col = "coverage_maizef", breaks = breaks, palette = "Blues") +
+  tm_layout(main.title = "Maize flour", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.7) +
+  tm_legend(show = F)
+
+maize_ADM1cov
+
+# legend: 
+coverage_legend1 <- tm_shape(nigeria1_coverage) + 
+  tm_fill(col = "coverage_maizef", breaks = breaks, palette = "Blues",
+          title = "Coverage (% of households with apparently inadequate
+diet with access to the fortification vehicle)",
+          labels = c("0", "0-30%", "30-60%", "60-80%", "80-100%"),
+          textNA = "Missing Data",
+          colorNA = "gray35") +
+  tm_layout(legend.only = T,
+            legend.position = c("center", "center"),
+            legend.width = 1,
+            legend.height = 1) +
+  tm_compass(north = 0, type = "arrow")
+
+coverage_legend1
+
+
+# Integrate these mapsand legend into a single figure: 
+
+coverage_ADM1 <- list(rice_ADM1cov, wheat_ADM1cov, maize_ADM1cov, coverage_legend1)
+
+coverage_ADM1 <- tmap_arrange(coverage_ADM1, ncol = 2, sync = TRUE)
+
+coverage_ADM1
+
+tmap_save(coverage_ADM1, "figures/coverage_ADM1.png", height = 5, width = 5)
+
+
+# ADM2
+
+# Rice
+rice_ADM2cov <- tm_shape(nigeria2_coverage) + 
+  tm_fill(col = "coverage_rice_combined", breaks = breaks, palette = "Blues",
+          colorNA = "gray35") +
+  tm_layout(main.title = "Rice", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.7) +
+  tm_legend(show = F)
+
+rice_ADM2cov
+
+# Wheat flour
+wheat_ADM2cov <- tm_shape(nigeria2_coverage) + 
+  tm_fill(col = "coverage_wheatf", breaks = breaks, palette = "Blues",
+          colorNA = "gray35") +
+  tm_layout(main.title = "Wheat flour", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.7) +
+  tm_legend(show = F)
+
+wheat_ADM2cov
+
+# Maize flour: 
+maize_ADM2cov <- tm_shape(nigeria2_coverage) + 
+  tm_fill(col = "coverage_maizef", breaks = breaks, palette = "Blues",
+          colorNA = "gray35") +
+  tm_layout(main.title = "Maize flour", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.7) +
+  tm_legend(show = F)
+
+maize_ADM2cov
+
+# legend: 
+coverage_legend2 <- tm_shape(nigeria2_coverage) + 
+  tm_fill(col = "coverage_maizef", breaks = breaks, palette = "Blues",
+          title = "Coverage (% of households with apparently inadequate
+diet with access to the fortification vehicle)",
+          labels = c("0", "0-30%", "30-60%", "60-80%", "80-100%"),
+          textNA = "Missing Data",
+          colorNA = "gray35") +
+  tm_layout(legend.only = T,
+            legend.position = c("center", "center"),
+            legend.width = 1,
+            legend.height = 1) +
+  tm_compass(north = 0, type = "arrow")
+
+coverage_legend2
+
+
+# Integrate these mapsand legend into a single figure: 
+
+coverage_ADM2 <- list(rice_ADM2cov, wheat_ADM2cov, maize_ADM2cov, coverage_legend2)
+
+coverage_ADM2 <- tmap_arrange(coverage_ADM2, ncol = 2, sync = TRUE)
+
+coverage_ADM2
+
+tmap_save(coverage_ADM2, "figures/coverage_ADM2.png", height = 5, width = 5)
+
+
+#-------------------------------------------------------------------------------
+
+# TESTING ALTERNATIVE COVERAGE THRESHOLDS
+
+# Calculate coverage using alternative thresholds for "inadequate diet", 
+# only at the ADM2 level for now: 
+
+coverage_lga_alt1 <- locations_targets %>% 
+  filter(risk_MND1 == "Yes") %>% group_by(lga) %>% 
+  summarise(coverage_rice_local = sum(rice_local == "Yes") / n(),
+            coverage_rice_imported = sum(rice_imported == "Yes") / n(),
+            coverage_rice_combined = sum(rice_combined == "Yes") / n(),
+            coverage_wheatf = sum(wheat_flour == "Yes") / n(),
+            coverage_maizef = sum(maize_flour == "Yes") / n())
+
+coverage_lga_alt3 <- locations_targets %>% 
+  filter(risk_MND3 == "Yes") %>% group_by(lga) %>% 
+  summarise(coverage_rice_local = sum(rice_local == "Yes") / n(),
+            coverage_rice_imported = sum(rice_imported == "Yes") / n(),
+            coverage_rice_combined = sum(rice_combined == "Yes") / n(),
+            coverage_wheatf = sum(wheat_flour == "Yes") / n(),
+            coverage_maizef = sum(maize_flour == "Yes") / n())
+
+# Merge to shapefiles: 
+nigeria2_coverage_alt1 <- dplyr::left_join(nigeria_2, coverage_lga_alt1, by = "lga")
+nigeria2_coverage_alt3 <- dplyr::left_join(nigeria_2, coverage_lga_alt3, by = "lga")
+
+# Save as new shapefiles:
+# st_write(nigeria2_coverage_alt1, "map_data/outputs/nigeria2_coverage_alt1.shp")
+# st_write(nigeria2_coverage_alt3, "map_data/outputs/nigeria2_coverage_alt3.shp")
+
+# No need to map these currently
+
+#-------------------------------------------------------------------------------
+
+# MICRONUTRIENT ADEQUACY:
+
+# Aggregate micronutrient adequacy at the ADM1 and ADM2 level:  
+
+micronutrients_ADM1 <- locations_targets %>% group_by(state) %>% 
+  summarise(vitamina_adequacy = sum(vitamina_adequate == "Adequate", na.rm = T) / n(),
+            folate_adequacy = sum(folate_adequate == "Adequate", na.rm = T) / n(),
+            zinc_adequacy = sum(zn_adequate == "Adequate", na.rm = T) / n(),
+            iron_adequacy = sum(fe_adequate == "Adequate", na.rm = T)/ n(),
+            b12_adequacy = sum(vitaminb12_adequate == "Adequate", na.rm = T)/ n())
+
+# Merge to shapefiles: 
+micronutrients_ADM1 <- dplyr::left_join(nigeria_1, micronutrients_ADM1, by = "state")
+
+# Map adequacy of MN's at ADM1 level
+
+breaks <- c(0, 0.2, 0.4, 0.6, 0.8, 1)
+
+# Vitamin A:
+vitamina_map <- tm_shape(micronutrients_ADM1) + 
+  tm_fill(col = "vitamina_adequacy", breaks = breaks, palette = "Blues") +
+  tm_layout(main.title = "Vitamin A", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.7) +
+  tm_legend(show = F)
+
+vitamina_map
+
+# Folate
+folate_map <- tm_shape(micronutrients_ADM1) + 
+  tm_fill(col = "folate_adequacy", breaks = breaks, palette = "Blues") +
+  tm_layout(main.title = "Folate", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.7) +
+  tm_legend(show = F)
+
+folate_map
+
+# Zinc: 
+zinc_map <- tm_shape(micronutrients_ADM1) + 
+  tm_fill(col = "zinc_adequacy", breaks = breaks, palette = "Blues") +
+  tm_layout(main.title = "Zinc", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.7) +
+  tm_legend(show = F)
+
+zinc_map
+
+# Iron: 
+iron_map <- tm_shape(micronutrients_ADM1) + 
+  tm_fill(col = "iron_adequacy", breaks = breaks, palette = "Blues") +
+  tm_layout(main.title = "Iron", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.7) +
+  tm_legend(show = F)
+
+iron_map
+
+# B12: 
+b12_map <- tm_shape(micronutrients_ADM1) + 
+  tm_fill(col = "b12_adequacy", breaks = breaks, palette = "Blues") +
+  tm_layout(main.title = "Vitamin B12", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.7) + 
+  tm_legend(show = F)
+
+b12_map
+
+# legend: 
+map_legend <- tm_shape(micronutrients_ADM1) + 
+  tm_fill(col = "b12_adequacy", breaks = breaks, palette = "Blues",
+          title = "Micronutrient Adequacy",
+          labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"),
+          textNA = "Missing Data",
+          colorNA = "gray35") +
+  tm_layout(legend.only = T,
+            legend.position = c("center", "center"),
+            legend.width = 1,
+            legend.height = 1) +
+  tm_compass(north = 0, type = "arrow")
+
+map_legend
+
+
+# Integrate these 5 maps and legend into a single figure: 
+
+maps_list <- list(vitamina_map, folate_map, zinc_map, iron_map, b12_map, map_legend)
+
+mn_ADM1 <- tmap_arrange(maps_list, ncol = 3, sync = TRUE)
+
+mn_ADM1
+
+tmap_save(mn_ADM1, "figures/mn_ADM1.png", height = 4.5, width = 7)
+
+#-------------------------------------------------------------------------------
+
+# Repeat for ADM2 level:
+
+micronutrients_ADM2 <- locations_targets %>% group_by(lga) %>% 
+  summarise(vitamina_adequacy = sum(vitamina_adequate == "Adequate", na.rm = T) / n(),
+            folate_adequacy = sum(folate_adequate == "Adequate", na.rm = T) / n(),
+            zinc_adequacy = sum(zn_adequate == "Adequate", na.rm = T) / n(),
+            iron_adequacy = sum(fe_adequate == "Adequate", na.rm = T)/ n(),
+            b12_adequacy = sum(vitaminb12_adequate == "Adequate", na.rm = T)/ n())
+
+# Merge to shapefiles: 
+micronutrients_ADM2 <- dplyr::left_join(nigeria_2, micronutrients_ADM2, by = "lga")
+
+# Create maps
+
+# Vitamin A:
+vitamina_ADM2 <- tm_shape(micronutrients_ADM2) + 
+  tm_fill(col = "vitamina_adequacy", breaks = breaks, palette = "Blues",
+          colorNA = "gray35") +
+  tm_layout(main.title = "Vitamin A", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.5) +
+  tm_legend(show = F)
+
+vitamina_ADM2
+
+# Folate
+folate_ADM2 <- tm_shape(micronutrients_ADM2) + 
+  tm_fill(col = "folate_adequacy", breaks = breaks, palette = "Blues",
+          colorNA = "gray35") +
+  tm_layout(main.title = "Folate", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.5) +
+  tm_legend(show = F)
+
+folate_ADM2
+
+# Zinc: 
+zinc_ADM2 <- tm_shape(micronutrients_ADM2) + 
+  tm_fill(col = "zinc_adequacy", breaks = breaks, palette = "Blues",
+          colorNA = "gray35") +
+  tm_layout(main.title = "Zinc", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.5) +
+  tm_legend(show = F)
+
+zinc_ADM2
+
+# Iron: 
+iron_ADM2 <- tm_shape(micronutrients_ADM2) + 
+  tm_fill(col = "iron_adequacy", breaks = breaks, palette = "Blues",
+          colorNA = "gray35") +
+  tm_layout(main.title = "Iron", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.5) +
+  tm_legend(show = F)
+
+iron_ADM2
+
+# B12: 
+b12_ADM2 <- tm_shape(micronutrients_ADM2) + 
+  tm_fill(col = "b12_adequacy", breaks = breaks, palette = "Blues",
+          colorNA = "gray35") +
+  tm_layout(main.title = "Vitamin B12", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.5) + 
+  tm_legend(show = F)
+
+b12_ADM2
+
+# legend: 
+ADM2_legend <- tm_shape(micronutrients_ADM2) + 
+  tm_fill(col = "b12_adequacy", breaks = breaks, palette = "Blues",
+          title = "Micronutrient Adequacy",
+          labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"),
+          textNA = "Missing Data",
+          colorNA = "gray35") +
+  tm_layout(legend.only = T,
+            legend.position = c("center", "center"),
+            legend.width = 1,
+            legend.height = 1) +
+  tm_compass(north = 0, type = "arrow")
+
+ADM2_legend
+
+
+# Integrate these 5 maps and legend into a single figure: 
+
+maps_list <- list(vitamina_ADM2, folate_ADM2, zinc_ADM2, iron_ADM2, b12_ADM2, ADM2_legend)
+
+mn_ADM2 <- tmap_arrange(maps_list, ncol = 3, sync = TRUE)
+
+mn_ADM2
+
+tmap_save(mn_ADM2, "figures/mn_ADM2.png", height = 4.5, width = 7)
+
+#-------------------------------------------------------------------------------
