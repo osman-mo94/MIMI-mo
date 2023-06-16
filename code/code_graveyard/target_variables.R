@@ -5,7 +5,7 @@
 # Install and load required packages:
 rq_packages <- c("readr", "tidyverse", "ggplot2", "janitor", "knitr",
                  "wesanderson", "ghibli", "ggthemes", "table1", "kableExtra",
-                 "reshape2")
+                 "reshape2", "srvyr")
 
 installed_packages <- rq_packages %in% rownames(installed.packages())
 if (any(installed_packages == FALSE)) {
@@ -72,8 +72,11 @@ food_consumption$food_purchased <- ifelse(is.na(food_consumption$food_purchased)
 
 #-------------------------------------------------------------------------------
 
-# Create df for target variables, for each household ID: 
-target_variables <- cover %>% dplyr::select("hhid")
+# Create df for target variables, for each household ID that has completed an
+# interview
+target_variables <- cover %>% 
+  dplyr::filter(interview_result == 1) %>% 
+  dplyr::select("hhid")
 
 # Add-in columns for each food item - binary yes/no depending on if they have 
 # been consumed and purchased, also add an additional column to indicate the 
@@ -641,3 +644,29 @@ knitr::kable(coverage_thresholds, col.names = c("Fortification vehicle",
 # target_variables$vitamina_rice <- target_variables$rice_combined_kg * rice_coefficients$fortification_coefficient[rice_coefficients$micronutrient == "vitamin_a"] /
 #   7 * target_variables$n_residents
 
+#-------------------------------------------------------------------------------
+
+# Get survey weights: 
+survey_weights <- cover %>% select(hhid, wt_final, ea)
+
+# join to target variables
+target_variables <- target_variables %>% 
+  left_join(survey_weights, by = "hhid")
+
+# Note that some of the survey weights are missing, find the index of these entries: 
+which(is.na(target_variables$wt_final))
+
+# Manually add these survey weights according to the enumeration area (according
+# to the survey documentation, all households in an EA have the same weight): 
+target_variables$wt_final[6613:6615] <- 1093.0268
+target_variables$wt_final[10717:10719] <- 1636.4668
+target_variables$wt_final[16986] <- 1332.726
+target_variables$wt_final[17107] <- 1211.833
+
+# Create tbl_svy object using target_variables dataframe: 
+svy_targets <- target_variables %>% 
+  srvyr::as_survey_design(ids = 1, 
+                          weights = wt_final,
+                          strata = ea)
+
+#-------------------------------------------------------------------------------

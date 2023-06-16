@@ -137,12 +137,47 @@ household_locations$lga <- gsub("-", " ", household_locations$lga)
 #-------------------------------------------------------------------------------
 
 # Source the target variables script:
-source("code/target_variables.R")
+source("code/create_targets.R")
 
 # Merge the df with locations to the df with targets
-locations_targets <- household_locations %>% 
-  left_join(target_variables,
+locations_targets <- target_variables %>% 
+  left_join(household_locations,
             by = "hhid")
+
+rm(target_variables)
+
+#-------------------------------------------------------------------------------
+
+# SURVEY WEIGHTS
+
+# Apply survey weights before calculating reach and cover
+
+# Get survey weights and enumeration areas: 
+cover <- read_csv("NLSS_data/Household/secta_cover.csv")
+
+survey_weights <- cover %>% dplyr::select(hhid, wt_final, ea)
+
+# Join weights to location_targets: 
+locations_targets <- locations_targets %>% 
+  left_join(survey_weights, by = "hhid")
+
+rm(list = c("cover", "survey_weights"))
+
+# Note that some of the survey weights are missing, find the index of these entries: 
+which(is.na(locations_targets$wt_final))
+
+# Manually add these survey weights according to the enumeration area (according
+# to the survey documentation, all households in an EA have the same weight): 
+locations_targets$wt_final[6613:6615] <- 1093.0268
+locations_targets$wt_final[10717:10719] <- 1636.4668
+locations_targets$wt_final[16986] <- 1332.726
+locations_targets$wt_final[17107] <- 1211.833
+
+# Create tbl_svy object using locations_targets dataframe: 
+svy_targets <- locations_targets %>% 
+  srvyr::as_survey_design(ids = 1, 
+                          weights = wt_final,
+                          strata = ea)
 
 #-------------------------------------------------------------------------------
 
@@ -150,23 +185,25 @@ locations_targets <- household_locations %>%
 
 # Calculate reach aggregated at the state level for each grain:
 
-reach_state <- locations_targets %>% 
+reach_state <- svy_targets %>% 
   group_by(state) %>% 
-  summarise(reach_rice_local = sum(rice_local == "Yes") / n(),
-            reach_rice_imported = sum(rice_imported == "Yes") / n(),
-            reach_rice_combined = sum(rice_combined == "Yes") / n(),
-            reach_wheatf = sum(wheat_flour == "Yes") / n(),
-            reach_maizef = sum(maize_flour == "Yes") / n())
+  summarise(reach_rice_combined = survey_mean(rice_combined == "Yes"),
+            reach_wheatf = survey_mean(wheat_flour == "Yes"),
+            reach_maizef = survey_mean(maize_flour == "Yes"))
+
+reach_state <- reach_state %>% 
+  dplyr::select(state, reach_rice_combined, reach_wheatf, reach_maizef)
 
 # Now calculate reach aggregated at LGA for each grain: 
 
-reach_lga <- locations_targets %>% 
+reach_lga <- svy_targets %>% 
   group_by(lga) %>% 
-  summarise(reach_rice_local = sum(rice_local == "Yes") / n(),
-            reach_rice_imported = sum(rice_imported == "Yes") / n(),
-            reach_rice_combined = sum(rice_combined == "Yes") / n(),
-            reach_wheatf = sum(wheat_flour == "Yes") / n(),
-            reach_maizef = sum(maize_flour == "Yes") / n())
+  summarise(reach_rice_combined = survey_mean(rice_combined == "Yes"),
+            reach_wheatf = survey_mean(wheat_flour == "Yes"),
+            reach_maizef = survey_mean(maize_flour == "Yes"))
+
+reach_lga <- reach_lga %>% 
+  dplyr::select(lga, reach_rice_combined, reach_wheatf, reach_maizef)
 
 n_distinct(household_locations$lga) 
 # Note that not all LGA's are represented in the survey: Only 741/774
@@ -455,23 +492,27 @@ tmap_save(reach_ADM2, "figures/reach_ADM2.png", height = 5, width = 5)
 
 # Calculate coverage aggregated at the state level for each staple grain: 
 
-coverage_state <- locations_targets %>% 
-  filter(risk_MND == "Yes") %>% group_by(state) %>% 
-  summarise(coverage_rice_local = sum(rice_local == "Yes") / n(),
-            coverage_rice_imported = sum(rice_imported == "Yes") / n(),
-            coverage_rice_combined = sum(rice_combined == "Yes") / n(),
-            coverage_wheatf = sum(wheat_flour == "Yes") / n(),
-            coverage_maizef = sum(maize_flour == "Yes") / n())
+coverage_state <- svy_targets %>% 
+  filter(risk_MND == "Yes") %>% 
+  group_by(state) %>% 
+  summarise(coverage_rice_combined = survey_mean(rice_combined == "Yes"),
+            coverage_wheatf = survey_mean(wheat_flour == "Yes"),
+            coverage_maizef = survey_mean(maize_flour == "Yes"))
+
+coverage_state <- coverage_state %>% 
+  dplyr::select(state, coverage_rice_combined, coverage_wheatf, coverage_maizef)
 
 # Calculate coverage aggregated at the lga level for each staple grain: 
 
-coverage_lga <- locations_targets %>% 
-  filter(risk_MND == "Yes") %>% group_by(lga) %>% 
-  summarise(coverage_rice_local = sum(rice_local == "Yes") / n(),
-            coverage_rice_imported = sum(rice_imported == "Yes") / n(),
-            coverage_rice_combined = sum(rice_combined == "Yes") / n(),
-            coverage_wheatf = sum(wheat_flour == "Yes") / n(),
-            coverage_maizef = sum(maize_flour == "Yes") / n())
+coverage_lga <- svy_targets %>% 
+  filter(risk_MND == "Yes") %>% 
+  group_by(lga) %>% 
+  summarise(coverage_rice_combined = survey_mean(rice_combined == "Yes"),
+            coverage_wheatf = survey_mean(wheat_flour == "Yes"),
+            coverage_maizef = survey_mean(maize_flour == "Yes"))
+
+coverage_lga <- coverage_lga %>% 
+  dplyr::select(lga, coverage_rice_combined, coverage_wheatf, coverage_maizef)
 
 # Merge coverage to the shapefiles:
 nigeria1_coverage <- dplyr::left_join(nigeria_1, coverage_state, by = "state")
@@ -485,7 +526,7 @@ nigeria2_coverage <- dplyr::left_join(nigeria_2, coverage_lga, by = "lga")
 
 # ADM1
 
-breaks <- c(0, 0.000001, 0.3, 0.6, 0.8, 1)
+breaks <- c(0, 0.000001, 0.3, 0.6, 0.8, 1.0000001)
 
 # Rice
 rice_ADM1cov <- tm_shape(nigeria1_coverage) + 
@@ -607,29 +648,48 @@ coverage_ADM2
 
 tmap_save(coverage_ADM2, "figures/coverage_ADM2.png", height = 5, width = 5)
 
+# Remove objects that are no longer required: 
+rm(list = c("coverage_ADM1", "coverage_ADM2", "coverage_legend1", "coverage_legend2",
+            "coverage_lga", "coverage_state", "maize_ADM1", "maize_ADM1cov",
+            "maize_ADM2", "maize_ADM2cov", "nigeria1_coverage", "nigeria1_reach",
+            "reach_ADM1", "reach_ADM2", "nigeria2_coverage", "nigeria2_reach",
+            "reach_legend1", "reach_legend2", "reach_lga", "reach_state", 
+            "rice_ADM1", "rice_ADM1cov", "rice_ADM2", "rice_ADM2cov", "wheat_ADM1",
+            "wheat_ADM1cov", "wheat_ADM2", "wheat_ADM2cov"))
 
 #-------------------------------------------------------------------------------
 
 # TESTING ALTERNATIVE COVERAGE THRESHOLDS
 
+# Create alternative thresholds:
+locations_targets$risk_MND1 <- ifelse(locations_targets$n_inadequate >= 1, 
+                                     "Yes", "No")
+
+locations_targets$risk_MND3 <- ifelse(locations_targets$n_inadequate >= 3,
+                                     "Yes", "No")
+
+# Update svy_targets with these new thresholds: 
+svy_targets <- locations_targets %>% 
+  srvyr::as_survey_design(ids = 1, 
+                          weights = wt_final,
+                          strata = ea)
+
 # Calculate coverage using alternative thresholds for "inadequate diet", 
 # only at the ADM2 level for now: 
 
-coverage_lga_alt1 <- locations_targets %>% 
-  filter(risk_MND1 == "Yes") %>% group_by(lga) %>% 
-  summarise(coverage_rice_local = sum(rice_local == "Yes") / n(),
-            coverage_rice_imported = sum(rice_imported == "Yes") / n(),
-            coverage_rice_combined = sum(rice_combined == "Yes") / n(),
-            coverage_wheatf = sum(wheat_flour == "Yes") / n(),
-            coverage_maizef = sum(maize_flour == "Yes") / n())
+coverage_lga_alt1 <- svy_targets %>% 
+  filter(risk_MND1 == "Yes") %>% 
+  group_by(state) %>% 
+  summarise(coverage_rice_combined = survey_mean(rice_combined == "Yes"),
+            coverage_wheatf = survey_mean(wheat_flour == "Yes"),
+            coverage_maizef = survey_mean(maize_flour == "Yes"))
 
-coverage_lga_alt3 <- locations_targets %>% 
-  filter(risk_MND3 == "Yes") %>% group_by(lga) %>% 
-  summarise(coverage_rice_local = sum(rice_local == "Yes") / n(),
-            coverage_rice_imported = sum(rice_imported == "Yes") / n(),
-            coverage_rice_combined = sum(rice_combined == "Yes") / n(),
-            coverage_wheatf = sum(wheat_flour == "Yes") / n(),
-            coverage_maizef = sum(maize_flour == "Yes") / n())
+coverage_lga_alt3 <- svy_targets %>% 
+  filter(risk_MND3 == "Yes") %>% 
+  group_by(state) %>% 
+  summarise(coverage_rice_combined = survey_mean(rice_combined == "Yes"),
+            coverage_wheatf = survey_mean(wheat_flour == "Yes"),
+            coverage_maizef = survey_mean(maize_flour == "Yes"))
 
 # Merge to shapefiles: 
 nigeria2_coverage_alt1 <- dplyr::left_join(nigeria_2, coverage_lga_alt1, by = "lga")
@@ -640,6 +700,7 @@ nigeria2_coverage_alt3 <- dplyr::left_join(nigeria_2, coverage_lga_alt3, by = "l
 # st_write(nigeria2_coverage_alt3, "map_data/outputs/nigeria2_coverage_alt3.shp")
 
 # No need to map these currently
+rm(list = c("coverage_lga_alt1", "coverage_lga_alt3"))
 
 #-------------------------------------------------------------------------------
 
@@ -647,23 +708,40 @@ nigeria2_coverage_alt3 <- dplyr::left_join(nigeria_2, coverage_lga_alt3, by = "l
 
 # Aggregate micronutrient adequacy at the ADM1 and ADM2 level:  
 
-micronutrients_ADM1 <- locations_targets %>% group_by(state) %>% 
-  summarise(vitamina_adequacy = sum(vitamina_adequate == "Adequate", na.rm = T) / n(),
-            folate_adequacy = sum(folate_adequate == "Adequate", na.rm = T) / n(),
-            zinc_adequacy = sum(zn_adequate == "Adequate", na.rm = T) / n(),
-            iron_adequacy = sum(fe_adequate == "Adequate", na.rm = T)/ n(),
-            b12_adequacy = sum(vitaminb12_adequate == "Adequate", na.rm = T)/ n())
+svy_targets %>% 
+  filter(risk_MND == "Yes") %>% 
+  group_by(state) %>% 
+  summarise(coverage_rice_combined = survey_mean(rice_combined == "Yes"),
+            coverage_wheatf = survey_mean(wheat_flour == "Yes"),
+            coverage_maizef = survey_mean(maize_flour == "Yes"))
+
+micronutrients_ADM1 <- svy_targets %>% 
+  group_by(state) %>% 
+  summarise(vitamina_inadequacy = survey_mean(vitamina_adequate == "Inadequate", 
+                                            na.rm = TRUE),
+            folate_inadequacy = survey_mean(folate_adequate == "Inadequate",
+                                          na.rm = TRUE),
+            zinc_inadequacy = survey_mean(zn_adequate == "Inadequate",
+                                        na.rm = TRUE),
+            iron_inadequacy = survey_mean(fe_adequate == "Inadequate",
+                                        na.rm = TRUE),
+            b12_inadequacy = survey_mean(vitaminb12_adequate == "Inadequate",
+                                       na.rm = TRUE))
+
+micronutrients_ADM1 <- micronutrients_ADM1 %>% 
+  dplyr::select(state, vitamina_inadequacy, folate_inadequacy, zinc_inadequacy, 
+                iron_inadequacy, b12_inadequacy)
 
 # Merge to shapefiles: 
 micronutrients_ADM1 <- dplyr::left_join(nigeria_1, micronutrients_ADM1, by = "state")
 
 # Map adequacy of MN's at ADM1 level
 
-breaks <- c(0, 0.2, 0.4, 0.6, 0.8, 1)
+breaks <- c(0, 0.000001, 0.3, 0.6, 0.8, 1.0000001)
 
 # Vitamin A:
 vitamina_map <- tm_shape(micronutrients_ADM1) + 
-  tm_fill(col = "vitamina_adequacy", breaks = breaks, palette = "Blues") +
+  tm_fill(col = "vitamina_inadequacy", breaks = breaks, palette = "Blues") +
   tm_layout(main.title = "Vitamin A", frame = F,
             main.title.size = 0.8) +
   tm_borders(col = "black", lwd = 0.7) +
@@ -673,7 +751,7 @@ vitamina_map
 
 # Folate
 folate_map <- tm_shape(micronutrients_ADM1) + 
-  tm_fill(col = "folate_adequacy", breaks = breaks, palette = "Blues") +
+  tm_fill(col = "folate_inadequacy", breaks = breaks, palette = "Blues") +
   tm_layout(main.title = "Folate", frame = F,
             main.title.size = 0.8) +
   tm_borders(col = "black", lwd = 0.7) +
@@ -683,7 +761,7 @@ folate_map
 
 # Zinc: 
 zinc_map <- tm_shape(micronutrients_ADM1) + 
-  tm_fill(col = "zinc_adequacy", breaks = breaks, palette = "Blues") +
+  tm_fill(col = "zinc_inadequacy", breaks = breaks, palette = "Blues") +
   tm_layout(main.title = "Zinc", frame = F,
             main.title.size = 0.8) +
   tm_borders(col = "black", lwd = 0.7) +
@@ -693,7 +771,7 @@ zinc_map
 
 # Iron: 
 iron_map <- tm_shape(micronutrients_ADM1) + 
-  tm_fill(col = "iron_adequacy", breaks = breaks, palette = "Blues") +
+  tm_fill(col = "iron_inadequacy", breaks = breaks, palette = "Blues") +
   tm_layout(main.title = "Iron", frame = F,
             main.title.size = 0.8) +
   tm_borders(col = "black", lwd = 0.7) +
@@ -703,7 +781,7 @@ iron_map
 
 # B12: 
 b12_map <- tm_shape(micronutrients_ADM1) + 
-  tm_fill(col = "b12_adequacy", breaks = breaks, palette = "Blues") +
+  tm_fill(col = "b12_inadequacy", breaks = breaks, palette = "Blues") +
   tm_layout(main.title = "Vitamin B12", frame = F,
             main.title.size = 0.8) +
   tm_borders(col = "black", lwd = 0.7) + 
@@ -713,8 +791,8 @@ b12_map
 
 # legend: 
 map_legend <- tm_shape(micronutrients_ADM1) + 
-  tm_fill(col = "b12_adequacy", breaks = breaks, palette = "Blues",
-          title = "Micronutrient Adequacy",
+  tm_fill(col = "b12_inadequacy", breaks = breaks, palette = "Blues",
+          title = "Micronutrient Inadequacy",
           labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"),
           textNA = "Missing Data",
           colorNA = "gray35") +
@@ -737,16 +815,30 @@ mn_ADM1
 
 tmap_save(mn_ADM1, "figures/mn_ADM1.png", height = 4.5, width = 7)
 
+# Remove objects no longer needed: 
+rm(list = c("b12_map", "folate_map", "iron_map", "map_legend", "maps_list",
+            "micronutrients_ADM1", "mn_ADM1", "vitamina_map", "zinc_map"))
+
 #-------------------------------------------------------------------------------
 
 # Repeat for ADM2 level:
 
-micronutrients_ADM2 <- locations_targets %>% group_by(lga) %>% 
-  summarise(vitamina_adequacy = sum(vitamina_adequate == "Adequate", na.rm = T) / n(),
-            folate_adequacy = sum(folate_adequate == "Adequate", na.rm = T) / n(),
-            zinc_adequacy = sum(zn_adequate == "Adequate", na.rm = T) / n(),
-            iron_adequacy = sum(fe_adequate == "Adequate", na.rm = T)/ n(),
-            b12_adequacy = sum(vitaminb12_adequate == "Adequate", na.rm = T)/ n())
+micronutrients_ADM2 <- svy_targets %>% 
+  group_by(lga) %>% 
+  summarise(vitamina_inadequacy = survey_mean(vitamina_adequate == "Inadequate", 
+                                            na.rm = TRUE),
+            folate_inadequacy = survey_mean(folate_adequate == "Inadequate",
+                                          na.rm = TRUE),
+            zinc_inadequacy = survey_mean(zn_adequate == "Inadequate",
+                                        na.rm = TRUE),
+            iron_inadequacy = survey_mean(fe_adequate == "Inadequate",
+                                        na.rm = TRUE),
+            b12_inadequacy = survey_mean(vitaminb12_adequate == "Inadequate",
+                                       na.rm = TRUE))
+
+micronutrients_ADM2 <- micronutrients_ADM2 %>% 
+  dplyr::select(lga, vitamina_inadequacy, folate_inadequacy, zinc_inadequacy, 
+                iron_inadequacy, b12_inadequacy)
 
 # Merge to shapefiles: 
 micronutrients_ADM2 <- dplyr::left_join(nigeria_2, micronutrients_ADM2, by = "lga")
@@ -755,7 +847,7 @@ micronutrients_ADM2 <- dplyr::left_join(nigeria_2, micronutrients_ADM2, by = "lg
 
 # Vitamin A:
 vitamina_ADM2 <- tm_shape(micronutrients_ADM2) + 
-  tm_fill(col = "vitamina_adequacy", breaks = breaks, palette = "Blues",
+  tm_fill(col = "vitamina_inadequacy", breaks = breaks, palette = "Blues",
           colorNA = "gray35") +
   tm_layout(main.title = "Vitamin A", frame = F,
             main.title.size = 0.8) +
@@ -766,7 +858,7 @@ vitamina_ADM2
 
 # Folate
 folate_ADM2 <- tm_shape(micronutrients_ADM2) + 
-  tm_fill(col = "folate_adequacy", breaks = breaks, palette = "Blues",
+  tm_fill(col = "folate_inadequacy", breaks = breaks, palette = "Blues",
           colorNA = "gray35") +
   tm_layout(main.title = "Folate", frame = F,
             main.title.size = 0.8) +
@@ -777,7 +869,7 @@ folate_ADM2
 
 # Zinc: 
 zinc_ADM2 <- tm_shape(micronutrients_ADM2) + 
-  tm_fill(col = "zinc_adequacy", breaks = breaks, palette = "Blues",
+  tm_fill(col = "zinc_inadequacy", breaks = breaks, palette = "Blues",
           colorNA = "gray35") +
   tm_layout(main.title = "Zinc", frame = F,
             main.title.size = 0.8) +
@@ -788,7 +880,7 @@ zinc_ADM2
 
 # Iron: 
 iron_ADM2 <- tm_shape(micronutrients_ADM2) + 
-  tm_fill(col = "iron_adequacy", breaks = breaks, palette = "Blues",
+  tm_fill(col = "iron_inadequacy", breaks = breaks, palette = "Blues",
           colorNA = "gray35") +
   tm_layout(main.title = "Iron", frame = F,
             main.title.size = 0.8) +
@@ -799,7 +891,7 @@ iron_ADM2
 
 # B12: 
 b12_ADM2 <- tm_shape(micronutrients_ADM2) + 
-  tm_fill(col = "b12_adequacy", breaks = breaks, palette = "Blues",
+  tm_fill(col = "b12_inadequacy", breaks = breaks, palette = "Blues",
           colorNA = "gray35") +
   tm_layout(main.title = "Vitamin B12", frame = F,
             main.title.size = 0.8) +
@@ -810,8 +902,8 @@ b12_ADM2
 
 # legend: 
 ADM2_legend <- tm_shape(micronutrients_ADM2) + 
-  tm_fill(col = "b12_adequacy", breaks = breaks, palette = "Blues",
-          title = "Micronutrient Adequacy",
+  tm_fill(col = "b12_inadequacy", breaks = breaks, palette = "Blues",
+          title = "Micronutrient Inadequacy",
           labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"),
           textNA = "Missing Data",
           colorNA = "gray35") +
