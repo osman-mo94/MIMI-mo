@@ -5,7 +5,7 @@
 # Install and load required packages:
 rq_packages <- c("readr", "tidyverse", "ggplot2", "janitor", "knitr",
                  "wesanderson", "ghibli", "ggthemes", "table1", "kableExtra",
-                 "srvyr", "lubridate")
+                 "lubridate")
 
 installed_packages <- rq_packages %in% rownames(installed.packages())
 if (any(installed_packages == FALSE)) {
@@ -28,6 +28,7 @@ income <- read_csv("NLSS_data/Household/sect13_income.csv")
 consumption <- read_csv("NLSS_data/Household/totcons.csv")
 assets <- read_csv("NLSS_data/Household/sect10_assets.csv")
 housing <- read_csv("NLSS_data/Household/sect14_housing.csv")
+labour <- read_csv("NLSS_data/Household/sect4a1_labour.csv")
 
 #-------------------------------------------------------------------------------
 
@@ -56,6 +57,10 @@ predictive_inputs <- predictive_inputs %>%
               summarise(proportion_male = sum(s01q02 == 1, na.rm = T)/n()),
             by = "hhid")  
 
+# Ensure that variables are in correct format: 
+class(predictive_inputs$n_residents)
+class(predictive_inputs$proportion_male)
+
 #-------------------------------------------------------------------------------
 
 # RELIGION: 
@@ -68,12 +73,17 @@ predictive_inputs <- predictive_inputs %>%
                         proportion_traditional = sum(s01q11 == 3, na.rm = T)/ n()), 
             by = "hhid")
 
+# Ensure that variables are in correct format: 
+class(predictive_inputs$proportion_christian)
+class(predictive_inputs$proportion_muslim)
+class(predictive_inputs$proportion_traditional)
+
 #-------------------------------------------------------------------------------
 
 # GEOGRAPHY: 
 
 predictive_inputs <- predictive_inputs %>% 
-  left_join(cover %>% select(hhid, sector) %>% 
+  left_join(cover %>% dplyr::select(hhid, sector) %>% 
               rename(geography = sector) %>% 
               mutate(geography = dplyr::case_when(
                 geography == 1 ~ "urban",
@@ -81,6 +91,10 @@ predictive_inputs <- predictive_inputs %>%
                 TRUE ~ NA_character_
               )),
             by = "hhid")
+
+# Ensure that variables are in the correct format: 
+class(predictive_inputs$geography)
+predictive_inputs$geography <- as.factor(predictive_inputs$geography)
 
 #-------------------------------------------------------------------------------
 
@@ -127,18 +141,22 @@ assets <- assets  %>% mutate(asset = dplyr::case_when(
 ))
 
 # Select only required columns from assets df:
-assets <- assets %>% select(hhid, asset, s10q01)
+assets <- assets %>% dplyr::select(hhid, asset, s10q01)
 
 # Create variables to indicate ownership of these assets in predictive_inputs: 
 assets_filtered <- assets %>%
   filter(s10q01 == 1) %>%
-  select(hhid, asset, s10q01) %>%
+  dplyr::select(hhid, asset, s10q01) %>%
   pivot_wider(names_from = asset, values_from = s10q01) %>% 
   select(- "NA")
 
 # Indicate non-ownership of items with a value of 0
 assets_filtered <- assets_filtered %>% 
   replace(is.na(assets_filtered), 0)
+
+# Ensure that variables are ordinal: 
+assets_filtered <- assets_filtered %>%
+  mutate(across(-hhid, ~factor(., levels = c(0, 1))))
 
 # Join to predictive_inputs df
 predictive_inputs <- predictive_inputs %>%
@@ -152,7 +170,8 @@ rm(list = c("assets", "assets_filtered"))
 # HOUSING: 
 
 # Select relevant columns: 
-housing <- housing %>% select(hhid, s14q02, s14q03, s14q09, s14q10, s14q11) %>% 
+housing <- housing %>% dplyr::select(hhid, s14q02, s14q03, 
+                                     s14q09, s14q10, s14q11) %>% 
   rename(dwelling_type = s14q02, 
          dwelling_tenure = s14q03,
          material_walls = s14q09,
@@ -213,6 +232,10 @@ housing <- housing %>% mutate(dwelling_type = case_when(
     TRUE ~ NA_character_
   ))
 
+# Ensure that the variables are categorical: 
+housing <- housing %>% 
+  mutate(across(-hhid, ~as.factor(.)))
+
 # Join to predictive inputs: 
 predictive_inputs <- predictive_inputs %>% 
   left_join(housing, by = "hhid")
@@ -226,9 +249,12 @@ rm(housing)
 
 predictive_inputs <- predictive_inputs  %>% 
   left_join(consumption %>% 
-              select(hhid, totcons_adj),
+              dplyr::select(hhid, totcons_adj),
             by = "hhid")  %>% 
   rename(total_consumption = totcons_adj)
+
+# Ensure that variable is numeric: 
+class(predictive_inputs$total_consumption)
 
 rm(consumption)
 
@@ -246,7 +272,7 @@ cover$InterviewStart <- as.POSIXlt(cover$InterviewStart,
 cover$year_interview <- as.numeric(format(cover$InterviewStart, "%Y"))
 
 # Join year of interview to roster data: 
-roster <- roster %>% left_join(cover %>% select(hhid, year_interview),
+roster <- roster %>% left_join(cover %>% dplyr::select(hhid, year_interview),
                                by = "hhid")
 
 # Use year of interview and year of birth to determine which household members 
@@ -257,7 +283,7 @@ roster$adult <- ifelse((roster$year_interview - roster$s01q06b) >= 18,
 
 # Join this data to education df: 
 education <- education %>% 
-  left_join(roster %>% select(hhid, indiv, adult), 
+  left_join(roster %>% dplyr::select(hhid, indiv, adult), 
             by = c("hhid", "indiv"))
 
 # Select columns of interest from education dataframe: 
@@ -291,6 +317,11 @@ predictive_inputs <- predictive_inputs %>% left_join(education, by = "hhid")
 # Remove eduction df (no longer required): 
 rm(education)
 
+# Check that variables are numeric: 
+class(predictive_inputs$proportion_primary)
+class(predictive_inputs$proportion_secondary)
+class(predictive_inputs$proportion_higher)
+
 #-------------------------------------------------------------------------------
 
 # INCOME:
@@ -320,6 +351,54 @@ predictive_inputs <- predictive_inputs %>% dplyr::select(-total_income)
 #-------------------------------------------------------------------------------
 
 # OCCUPATION
+
+# Note that 18 is the age of majority (adulthood) as specified by the Nigerian 
+# constitution.
+
+# In this section, I will create variables to indicate type of employment of 
+# individuals in each household: 
+labour <- labour %>% dplyr::select(hhid, indiv, s04aq04, s04aq06, s04aq09,
+                                   s04aq11) %>% 
+  rename(wage_salary = s04aq04,
+         own_agriculture = s04aq06, 
+         own_NFE = s04aq09, 
+         trainee_apprentice = s04aq11)  %>% 
+  mutate(across(c("wage_salary", "own_agriculture", "own_NFE"), 
+                ~ifelse(. != 1, NA, .))) %>% 
+  mutate(trainee_apprentice = ifelse(trainee_apprentice == 1 | 
+                                     trainee_apprentice == 2, 1, NA))
+
+labour$wage_salary[is.na(labour$wage_salary)] <- 0
+labour$own_agriculture[is.na(labour$own_agriculture)] <- 0
+labour$own_NFE[is.na(labour$own_NFE)] <- 0
+labour$trainee_apprentice[is.na(labour$trainee_apprentice)] <- 0
+
+# Filter df to include only adults (over 18):
+labour <- labour %>% 
+  left_join(roster %>% dplyr::select(hhid, indiv, adult),
+            by = c("hhid", "indiv")) %>% 
+  filter(adult == "Yes") %>% select(-adult)
+
+# Now create variables to indicate proportion of adults in each household who 
+# are working in each type of employment: 
+labour <- labour %>% 
+  group_by(hhid) %>% 
+  summarise(proportion_wage_salary = sum(wage_salary == 1, na.rm = T) / n(),
+            proportion_own_agriculture = sum(own_agriculture == 1, na.rm = T) / n(),
+            proportion_own_NFE = sum(own_NFE == 1, na.rm = T) / n(),
+            proportion_trainee_apprentice = sum(trainee_apprentice == 1, na.rm = T) / n())
+
+# Join these columns to predictive input df: 
+predictive_inputs <- predictive_inputs %>% left_join(labour, by = "hhid")
+
+# Check that these new variables are of class "numeric": 
+class(predictive_inputs$proportion_wage_salary)
+class(predictive_inputs$proportion_own_agriculture)
+class(predictive_inputs$proportion_own_NFE)
+class(predictive_inputs$proportion_trainee_apprentice)
+
+# Remove labour df (no longer required): 
+rm(labour)
 
 #-------------------------------------------------------------------------------
 
