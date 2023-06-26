@@ -5,7 +5,7 @@
 # Install and load required packages:
 rq_packages <- c("readr", "tidyverse", "ggplot2", "janitor", "knitr",
                  "wesanderson", "ghibli", "ggthemes", "table1", "kableExtra",
-                 "srvyr")
+                 "srvyr", "lubridate")
 
 installed_packages <- rq_packages %in% rownames(installed.packages())
 if (any(installed_packages == FALSE)) {
@@ -56,8 +56,17 @@ predictive_inputs <- predictive_inputs %>%
               summarise(proportion_male = sum(s01q02 == 1, na.rm = T)/n()),
             by = "hhid")  
 
-# Remove roster df (not required further): 
-rm(roster)
+#-------------------------------------------------------------------------------
+
+# RELIGION: 
+
+predictive_inputs <- predictive_inputs %>% 
+  left_join(roster %>% 
+              group_by(hhid) %>% 
+              summarise(proportion_christian = sum(s01q11 == 1, na.rm = T)/ n(),
+                        proportion_muslim = sum(s01q11 == 2, na.rm = T)/ n(),
+                        proportion_traditional = sum(s01q11 == 3, na.rm = T)/ n()), 
+            by = "hhid")
 
 #-------------------------------------------------------------------------------
 
@@ -72,9 +81,6 @@ predictive_inputs <- predictive_inputs %>%
                 TRUE ~ NA_character_
               )),
             by = "hhid")
-
-# Remove cover df (not required further): 
-rm(cover)
 
 #-------------------------------------------------------------------------------
 
@@ -230,6 +236,61 @@ rm(consumption)
 
 # EDUCATION:
 
+# In this section, I will determine educational attainments of adult in the 
+# household: 
+
+# Need to first determine year of interview: 
+cover$InterviewStart <- as.POSIXlt(cover$InterviewStart, 
+                                   format = "%m/%d/%Y %H:%M:%OS")
+
+cover$year_interview <- as.numeric(format(cover$InterviewStart, "%Y"))
+
+# Join year of interview to roster data: 
+roster <- roster %>% left_join(cover %>% select(hhid, year_interview),
+                               by = "hhid")
+
+# Use year of interview and year of birth to determine which household members 
+# were adults at the time of interview (over 18 years old):
+
+roster$adult <- ifelse((roster$year_interview - roster$s01q06b) >= 18, 
+                       "Yes", "No")
+
+# Join this data to education df: 
+education <- education %>% 
+  left_join(roster %>% select(hhid, indiv, adult), 
+            by = c("hhid", "indiv"))
+
+# Select columns of interest from education dataframe: 
+education <- education %>% select(hhid, indiv, adult, s02q08) %>% 
+  rename(education_attainment = s02q08)
+
+# If individuals answered "other", code as missing:
+education$education_attainment[education$education_attainment == 13] <- NA
+
+# Create variable to indicate if completed primary education: 
+education$primary <- ifelse(education$education_attainment >= 2, 1, 0)
+
+# Create variable to indicate if completed secondary education: 
+education$secondary <- ifelse(education$education_attainment >= 6, 1, 0)
+
+# Create variable to indicate if completed higher education: 
+education$higher <- ifelse(education$education_attainment >= 7, 1, 0)
+
+# Get proportion of adults in each household that have completed each stage of 
+# education: 
+education <- education %>% 
+  filter(adult == "Yes") %>% 
+  group_by(hhid) %>% 
+  summarise(proportion_primary = sum(primary == 1, na.rm = T) / n(),
+            proportion_secondary = sum(secondary == 1, na.rm = T) / n(),
+            proportion_higher = sum(higher == 1, na.rm = T ) / n())
+
+# Join these variables onto predictive inputs df: 
+predictive_inputs <- predictive_inputs %>% left_join(education, by = "hhid")
+
+# Remove eduction df (no longer required): 
+rm(education)
+
 #-------------------------------------------------------------------------------
 
 # INCOME:
@@ -249,6 +310,7 @@ predictive_inputs <- predictive_inputs %>%
 # Remove household_income df (not required further):
 rm(list = c("household_income", "income"))
 
+# See how many households are missing data on total income: 
 length(which(is.na(predictive_inputs$total_income))) 
 
 # Given that the overwhelming majority of households are missing data on income, 
@@ -258,6 +320,9 @@ predictive_inputs <- predictive_inputs %>% dplyr::select(-total_income)
 #-------------------------------------------------------------------------------
 
 # OCCUPATION
+
+#-------------------------------------------------------------------------------
+
 
 # ??Participatory wealth ranking
 
