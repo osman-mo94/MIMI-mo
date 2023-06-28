@@ -247,6 +247,8 @@ rm(housing)
 
 # HOUSEHOLD CONSUMPTION AND EXPENDITURE: 
 
+# Note that this is an adjusted value (spatially and temporally), per capita
+
 predictive_inputs <- predictive_inputs  %>% 
   left_join(consumption %>% 
               dplyr::select(hhid, totcons_adj),
@@ -257,6 +259,10 @@ predictive_inputs <- predictive_inputs  %>%
 class(predictive_inputs$total_consumption)
 
 rm(consumption)
+
+# Create a new variable for quintile of total consumption (1lowest, 5 highest): 
+predictive_inputs <- predictive_inputs %>% 
+  mutate(consumption_quintile = ntile(total_consumption, 5))
 
 #-------------------------------------------------------------------------------
 
@@ -402,7 +408,6 @@ rm(labour)
 
 #-------------------------------------------------------------------------------
 
-
 # ??Participatory wealth ranking
 
 # ??Subjective measures
@@ -410,3 +415,6 @@ rm(labour)
 #-------------------------------------------------------------------------------
 
 # ENSURE THAT ALL VARIABLES ARE CORRECT TYPE (CATEGORICAL, CONTINOUS ETC.)
+
+# Remove objects no longer required: 
+rm(list = c("cover", "roster"))
