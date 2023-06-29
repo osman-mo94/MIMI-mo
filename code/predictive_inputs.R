@@ -29,6 +29,7 @@ consumption <- read_csv("NLSS_data/Household/totcons.csv")
 assets <- read_csv("NLSS_data/Household/sect10_assets.csv")
 housing <- read_csv("NLSS_data/Household/sect14_housing.csv")
 labour <- read_csv("NLSS_data/Household/sect4a1_labour.csv")
+agriculture <- read_csv("NLSS_data/Household/sect18_agriculture.csv")
 
 #-------------------------------------------------------------------------------
 
@@ -158,6 +159,11 @@ assets_filtered <- assets_filtered %>%
 assets_filtered <- assets_filtered %>%
   mutate(across(-hhid, ~factor(., levels = c(0, 1))))
 
+
+# Filter for selected assets:
+assets_filtered <- assets_filtered %>% 
+  select(hhid, radio, tv, smart_phones, reg_mobile_phone, fridge, cars_vehicles)
+
 # Join to predictive_inputs df
 predictive_inputs <- predictive_inputs %>%
   left_join(assets_filtered, by = "hhid") 
@@ -165,83 +171,75 @@ predictive_inputs <- predictive_inputs %>%
 # Remove objects that are not required further: 
 rm(list = c("assets", "assets_filtered"))
 
+
 #-------------------------------------------------------------------------------
 
 # HOUSING: 
 
-# Select relevant columns: 
-housing <- housing %>% dplyr::select(hhid, s14q02, s14q03, 
-                                     s14q09, s14q10, s14q11) %>% 
-  rename(dwelling_type = s14q02, 
-         dwelling_tenure = s14q03,
-         material_walls = s14q09,
-         material_roof = s14q10, 
-         material_floor = s14q11)
+# Will not use dwelling_type for now, but may use in a future iteration.
 
-housing <- housing %>% mutate(dwelling_type = case_when(
-  dwelling_type == 1 ~ "bungalow", 
-  dwelling_type == 2 ~ "semi-detached house",
-  dwelling_type == 3 ~ "flat/apartment",
-  dwelling_type == 4 ~ "compound house",
-  dwelling_type == 5 ~ "huts/buildings (same compound)", 
-  dwelling_type == 6 ~ "huts/buildings (diff compound)",
-  dwelling_type == 7 ~ "tents",
-  dwelling_type == 8 ~ "improvised home",
-  dwelling_type == 9 ~ "office/shop",
-  dwelling_type == 10 ~ "incomplete building",
-  TRUE ~ NA_character_
-)) %>% 
+# Select relevant columns: 
+housing <- housing %>% dplyr::select(hhid, s14q03, s14q11, s14q12, 
+                                     # s14q02 (dwelling_type),
+                                     s14q19, s14q27, s14q40) %>% 
+  rename(dwelling_tenure = s14q03,
+         # dwelling_type = s14q02,
+         material_floor = s14q11,
+         n_rooms = s14q12,
+         electricity = s14q19, 
+         water_source = s14q27, 
+         toilet_facility = s14q40)
+
+housing <- housing %>% 
+#   mutate(dwelling_type = case_when(
+#   dwelling_type == 1 ~ "bungalow", 
+#   dwelling_type == 2 ~ "semi-detached house",
+#   dwelling_type == 3 ~ "flat/apartment",
+#   dwelling_type == 4 ~ "compound house",
+#   dwelling_type == 5 ~ "huts/buildings (same compound)", 
+#   dwelling_type == 6 ~ "huts/buildings (diff compound)",
+#   dwelling_type == 7 ~ "tents",
+#   dwelling_type == 8 ~ "improvised home",
+#   dwelling_type == 9 ~ "office/shop",
+#   dwelling_type == 10 ~ "incomplete building",
+#   TRUE ~ NA_character_
+# )) %>% 
   mutate(dwelling_tenure = case_when(
-    dwelling_tenure == 1 ~ "owned",
-    dwelling_tenure == 2 ~ "free (authorised)", 
-    dwelling_tenure == 3 ~ "free (unauthorised)", 
-    dwelling_tenure == 4 ~ "rented"
-  )) %>% 
-  mutate(material_walls = case_when(
-    material_walls == 1 ~ "mud", 
-    material_walls == 2 ~ "stone",
-    material_walls == 3 ~ "unburnt bricks", 
-    material_walls == 4 ~ "burnt bricks", 
-    material_walls == 5 ~ "cement/concrete", 
-    material_walls == 6 ~ "wood or bamboo", 
-    material_walls == 7 ~ "iron sheets", 
-    material_walls == 8 ~ "cardboard", 
-    TRUE ~ NA_character_
-  )) %>% 
-  mutate(material_roof = case_when(
-    material_roof == 1 ~ "thatch", 
-    material_roof == 2 ~ "corrugated iron", 
-    material_roof == 3 ~ "clay tiles", 
-    material_roof == 4 ~ "cement/concrete", 
-    material_roof == 5 ~ "plastic sheet", 
-    material_roof == 6 ~ "asbestos sheet", 
-    material_roof == 7 ~ "mud", 
-    material_roof == 8 ~ "span sheets", 
-    material_roof == 9 ~ "step tiles", 
-    material_roof == 11 ~ "zinc sheet",
-    TRUE ~ NA_character_
+    dwelling_tenure == 1 ~ "4",
+    dwelling_tenure == 2 ~ "2", 
+    dwelling_tenure == 3 ~ "1", 
+    dwelling_tenure == 4 ~ "3"
   )) %>% 
   mutate(material_floor = case_when(
-    material_floor == 1 ~ "sand/dirt/straw",
-    material_floor == 2 ~ "smoothed mud", 
-    material_floor == 3 ~ "cement/concrete",
-    material_floor == 4 ~ "wood",
-    material_floor == 5 ~ "tile", 
-    material_floor == 6 ~ "terazo", 
-    material_floor == 7 ~ "marble", 
+    material_floor %in% c(1:2) ~ "0", 
+    material_floor %in% c(3:7) ~ "1",
+    TRUE ~ NA_character_
+  )) %>% 
+  mutate(electricity = ifelse(electricity == 2, 0, electricity)) %>% 
+  mutate(water_source = case_when(
+    water_source %in% c(1, 2, 3, 4, 5, 6, 8, 10, 11, 12, 14, 16) ~ "1", 
+    water_source %in% c(7, 9, 13, 17) ~ "0", 
+    TRUE ~ NA_character_
+  )) %>% 
+  mutate(toilet_facility = case_when(
+    toilet_facility %in% c(1, 2, 3, 6, 7, 9) ~ "2", 
+    toilet_facility %in% c(4, 5, 8, 10, 11, 14) ~ "1", 
+    toilet_facility == 12 ~ "0",
     TRUE ~ NA_character_
   ))
 
-# Ensure that the variables are categorical: 
-housing <- housing %>% 
-  mutate(across(-hhid, ~as.factor(.)))
+# Ensure all variables in housing are numeric:
+housing <- housing %>% mutate(across(-hhid, ~as.numeric(.)))
 
 # Join to predictive inputs: 
 predictive_inputs <- predictive_inputs %>% 
   left_join(housing, by = "hhid")
 
-# Remove housing object: 
+# Remove housing df: 
 rm(housing)
+
+# Calculate persons per sleeping room: 
+predictive_inputs$n_per_room <- predictive_inputs$n_rooms / predictive_inputs$n_residents
 
 #-------------------------------------------------------------------------------
 
@@ -266,7 +264,26 @@ predictive_inputs <- predictive_inputs %>%
 
 #-------------------------------------------------------------------------------
 
-# EDUCATION:
+# OWNERSHIP OR ACCESS TO AGRICULTURAL LAND
+
+# Select required columns from agriculture df and rename:
+agriculture <- agriculture %>% select(hhid, s18q01)
+names(agriculture) <- c("hhid", "agricultural_land")
+
+# Indicate no access to agricultural land with 0, and 1 for access: 
+agriculture$agricultural_land[agriculture$agricultural_land == 2] <- 0 
+agriculture$agricultural_land[is.na(agriculture$agricultural_land)] <- 0
+
+# Join data to predictive_inputs df: 
+predictive_inputs <- predictive_inputs %>% 
+  left_join(agriculture, by = "hhid")
+
+# Remove agriculture df: 
+rm(agriculture)
+
+#-------------------------------------------------------------------------------
+
+# EDUCATION OF ADULTS:
 
 # In this section, I will determine educational attainments of adult in the 
 # household: 
@@ -320,13 +337,13 @@ education <- education %>%
 # Join these variables onto predictive inputs df: 
 predictive_inputs <- predictive_inputs %>% left_join(education, by = "hhid")
 
-# Remove eduction df (no longer required): 
-rm(education)
-
 # Check that variables are numeric: 
 class(predictive_inputs$proportion_primary)
 class(predictive_inputs$proportion_secondary)
 class(predictive_inputs$proportion_higher)
+
+# Remove education df: 
+rm(education)
 
 #-------------------------------------------------------------------------------
 
@@ -408,13 +425,31 @@ rm(labour)
 
 #-------------------------------------------------------------------------------
 
-# ??Participatory wealth ranking
-
-# ??Subjective measures
+# Remove objects no longer required: 
+rm(list = c("cover", "roster"))
 
 #-------------------------------------------------------------------------------
 
-# ENSURE THAT ALL VARIABLES ARE CORRECT TYPE (CATEGORICAL, CONTINOUS ETC.)
+# FINALISE DATAFRAME
 
-# Remove objects no longer required: 
-rm(list = c("cover", "roster"))
+# Remove variables that are no longer required: 
+predictive_inputs <- predictive_inputs %>% select(-c("n_residents", "n_rooms"))
+
+# Re-order variables: 
+new_order <- c("hhid", "dwelling_tenure", "material_floor", "electricity", 
+               "water_source", "toilet_facility", "n_per_room", "agricultural_land",  
+               "radio", "tv", "smart_phones", "reg_mobile_phone", "fridge", 
+               "cars_vehicles", "proportion_male", "proportion_christian", 
+               "proportion_muslim","proportion_traditional", "proportion_primary", 
+               "proportion_secondary", "proportion_higher", "proportion_wage_salary", 
+               "proportion_own_agriculture","proportion_own_NFE", 
+               "proportion_trainee_apprentice", "geography", "total_consumption", 
+               "consumption_quintile")
+
+predictive_inputs <- predictive_inputs[,new_order]
+
+rm(new_order)
+
+################################################################################
+############################## END OF SCRIPT ###################################
+################################################################################

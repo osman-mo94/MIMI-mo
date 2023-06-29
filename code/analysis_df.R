@@ -31,10 +31,7 @@ analysis_df <- target_variables %>%
 
 # Join desired predictive inputs: 
 analysis_df <- analysis_df %>% 
-  left_join(predictive_inputs %>% 
-              dplyr::select(hhid, proportion_male, proportion_christian, proportion_muslim,
-                     proportion_traditional, proportion_primary, proportion_secondary, 
-                     proportion_higher), 
+  left_join(predictive_inputs, 
             by = "hhid")
 
 # Remove objects no longer needed: 
