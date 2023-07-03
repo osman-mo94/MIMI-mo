@@ -239,7 +239,7 @@ predictive_inputs <- predictive_inputs %>%
 rm(housing)
 
 # Calculate persons per sleeping room: 
-predictive_inputs$n_per_room <- predictive_inputs$n_rooms / predictive_inputs$n_residents
+predictive_inputs$n_per_room <- predictive_inputs$n_residents / predictive_inputs$n_rooms
 
 #-------------------------------------------------------------------------------
 
