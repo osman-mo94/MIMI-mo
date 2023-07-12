@@ -115,19 +115,19 @@ label(analysis_df$proportion_muslim) <- "Proportion of Muslim residents"
 
 label(analysis_df$proportion_traditional) <- "Proportion of residents practicing \n a traditional religion"
 
-label(analysis_df$proportion_primary) <- "Primary education"
+label(analysis_df$proportion_primary) <- "Proportion of residents that have completed primary education"
 
-label(analysis_df$proportion_secondary) <- "Secondary education"
+label(analysis_df$proportion_secondary) <- "Proportion of residents that have completed secondary education"
 
-label(analysis_df$proportion_higher) <- "Higher education"
+label(analysis_df$proportion_higher) <- "Proportion of residents that have completed higher education"
 
-label(analysis_df$proportion_wage_salary) <- "Wage/salary job"
+label(analysis_df$proportion_wage_salary) <- "Proportion of residents in Wage/salary job"
 
-label(analysis_df$proportion_own_agriculture) <- "Own agricultural work"
+label(analysis_df$proportion_own_agriculture) <- "Proportion of residents: Own agricultural work"
 
-label(analysis_df$proportion_own_NFE) <- "Own non-farm enterprise work"
+label(analysis_df$proportion_own_NFE) <- "Proportion of residents: Own non-farm enterprise work"
 
-label(analysis_df$proportion_trainee_apprentice) <- "Trainee/apprentice"
+label(analysis_df$proportion_trainee_apprentice) <- "Proportion of residents: Trainee/apprentice"
 
 analysis_df$geography <- factor(analysis_df$geography, 
                                 levels = c("rural", "urban"), 
@@ -179,20 +179,6 @@ my.pvalue <- function(x, ...) {
 
 #-------------------------------------------------------------------------------
 
-table1(~ dwelling_tenure + material_floor + electricity + water_source + toilet_facility +
-         n_per_room + agricultural_land + radio + tv + smart_phones + reg_mobile_phone + 
-         fridge + cars_vehicles + proportion_male + proportion_christian + proportion_muslim +
-         proportion_traditional + proportion_primary + proportion_secondary + proportion_higher +
-         proportion_wage_salary + proportion_own_agriculture + proportion_own_NFE + 
-         proportion_trainee_apprentice + geography + consumption_quintile | rice_combined, 
-       data = analysis_df, 
-       render.missing = my.render.missing,
-       render.continuous = my.render.cont, 
-       overall = FALSE,
-       extra.col = list(`P-value` = my.pvalue))
-
-#-------------------------------------------------------------------------------
-
 # GEOGRAPHY AND SOCIOECONOMIC POSITION: 
 
 table1(~ geography + consumption_quintile | rice_combined, 
@@ -201,6 +187,8 @@ table1(~ geography + consumption_quintile | rice_combined,
        render.continuous = my.render.cont, 
        overall = FALSE,
        extra.col = list(`P-value` = my.pvalue))
+
+# Save table from R-studio viewer.
 
 #-------------------------------------------------------------------------------
 
@@ -214,6 +202,8 @@ table1(~ proportion_male + proportion_christian + proportion_muslim +
        overall = FALSE,
        extra.col = list(`P-value` = my.pvalue))
 
+# Save table from R-studio viewer. 
+
 #-------------------------------------------------------------------------------
 
 # HOUSEHOLD AND FACILITIES: 
@@ -225,6 +215,8 @@ table1(~ dwelling_tenure + material_floor + electricity + water_source +
        render.continuous = my.render.cont, 
        overall = FALSE,
        extra.col = list(`P-value` = my.pvalue))
+
+# Save table from R-studio viewer. 
 
 #-------------------------------------------------------------------------------
 
@@ -238,6 +230,8 @@ table1(~ radio + tv + smart_phones + reg_mobile_phone + fridge +
        overall = FALSE,
        extra.col = list(`P-value` = my.pvalue))
 
+# Save table from R-studio viewer. 
+
 #-------------------------------------------------------------------------------
 
 # EDUCATION AND LABOUR: 
@@ -250,3 +244,7 @@ table1(~ proportion_primary + proportion_secondary + proportion_higher +
        render.continuous = my.render.cont, 
        overall = FALSE,
        extra.col = list(`P-value` = my.pvalue))
+
+# Save table from R-studio viewer. 
+
+#-------------------------------------------------------------------------------
