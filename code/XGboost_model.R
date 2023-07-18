@@ -16,8 +16,10 @@ rm(list= c("rq_packages", "installed_packages"))
 
 #-------------------------------------------------------------------------------
 
-# Read in analysis data-frame: 
-source("code/analysis_df.R")
+# READ IN DATA:
+
+# Read in analysis dataframe: 
+analysis_df <- read_csv("NLSS_data/analysis_df.csv")
 
 #-------------------------------------------------------------------------------
 
@@ -27,26 +29,48 @@ analysis_df$rice_combined <- factor(analysis_df$rice_combined,
                                     labels = c("No", "Yes"), 
                                     levels = c("No", "Yes"))
 
+analysis_df$wheat_flour <- factor(analysis_df$wheat_flour, 
+                                  levels = c("No", "Yes"),
+                                  labels = c("No", "Yes"))
+
+analysis_df$maize_flour <- factor(analysis_df$maize_flour, 
+                                  levels = c("No", "Yes"),
+                                  labels = c("No", "Yes"))
+
+analysis_df$risk_MND <- factor(analysis_df$risk_MND, 
+                               levels = c("No", "Yes"),
+                               labels = c("No", "Yes"))
+
+analysis_df$geography <- factor(analysis_df$geography, 
+                                levels = c("urban", "rural"),
+                                labels = c("urban", "rural"))
+
+# Re-organise position of columns: 
+analysis_df <- analysis_df %>% relocate(rice_combined, .after = hhid)
+
 #-------------------------------------------------------------------------------
 
-# MISSING DATA:
+# TRAIN-TEST SPLIT: 
 
-# Filter data-frame to include only complete cases: 
-analysis_df <- analysis_df %>% filter(complete.cases(analysis_df))
+# Stratify split by LGA to ensure that we have enough predictions for mapping:
+index <- partition(y = analysis_df$lga, p = c(train = 0.8, test = 0.2), 
+                   split_into_list = FALSE)
 
-# Note that I will revisit this, to explore methods of imputing missing data.
+# Create training and test sets:
+train <- analysis_df[index == "train", ]
+test <- analysis_df[index == "test", ]
 
 #-------------------------------------------------------------------------------
 
-# TRAIN/TEST SPLIT:
-# Split the data into training and testing sets: 
-set.seed(450)
+# IMBALANCED DATA: 
 
-# Using 80% of data for training and 20% for testing:
-index <- sample(1:nrow(analysis_df), nrow(analysis_df) * 0.8)
+# Use downsampling
+set.seed(123)
+rice_train <- downSample(x = train[, -ncol(train)],
+                         y = train$rice_combined)
 
-train_data <- analysis_df[index, ]
-test_data <- analysis_df[-index, ]
+# View distribution of classes in balanced dataset
+table(rice_train$rice_combined)
 
 #-------------------------------------------------------------------------------
 
@@ -108,7 +132,7 @@ XGb_tuning <- train(rice_combined ~ dwelling_tenure + material_floor + electrici
                       proportion_secondary + proportion_higher + 
                       proportion_wage_salary + proportion_own_agriculture + 
                       proportion_own_NFE + proportion_trainee_apprentice + geography,
-                    data = train_data, 
+                    data = rice_train, 
                     method = "xgbTree",
                     trControl = XGb_ctrl,
                     tuneGrid = tuning_grid, 
@@ -133,7 +157,7 @@ confusionMatrix(XGb_tuning)
 # Fit with the optimal hyperparameters:
 tuning_grid <- expand.grid(nrounds = c(400),
                            max_depth = c(4),
-                           eta = c(0.1),
+                           eta = c(0.05),
                            gamma = c(0),
                            colsample_bytree = c(0.3),
                            min_child_weight = c(1),
@@ -151,21 +175,21 @@ XGb_final <- train(rice_combined ~ dwelling_tenure + material_floor + electricit
                       proportion_secondary + proportion_higher + 
                       proportion_wage_salary + proportion_own_agriculture + 
                       proportion_own_NFE + proportion_trainee_apprentice + geography,
-                    data = train_data, 
+                    data = rice_train, 
                     method = "xgbTree",
                     trControl = XGb_ctrl,
                     tuneGrid = tuning_grid, 
                     verbose = TRUE)
 
-xgb_predictions <- predict(XGb_final, test_data)
+xgb_predictions <- predict(XGb_final, test)
 
-xgb.prec_recall <- confusionMatrix(xgb_predictions, test_data$rice_combined, 
+xgb.prec_recall <- confusionMatrix(xgb_predictions, test$rice_combined, 
                                   positive = "Yes", 
                                   mode = "prec_recall")
 
 xgb.prec_recall
 
-xgb.sens_spec <- confusionMatrix(xgb_predictions, test_data$rice_combined, 
+xgb.sens_spec <- confusionMatrix(xgb_predictions, test$rice_combined, 
                                 positive = "Yes", 
                                 mode = "sens_spec")
 
@@ -201,3 +225,16 @@ ggsave("figures/ML_outputs/vipXGB.jpeg",
        dpi = 600)
 
 #-------------------------------------------------------------------------------
+
+# SAVE PREDICTIONS AND ASSOCIATED HHID's AS DATAFRAME: 
+
+xgb_predictions <- as.data.frame(xgb_predictions)
+xgb_predictions$hhid <- test$hhid
+
+write_csv(xgb_predictions, "map_data/ML_predictions/xgb_rice_predictions.csv")
+
+################################################################################
+############################## END OF SCRIPT ###################################
+################################################################################
+
+
