@@ -32,9 +32,17 @@ cover <- read_csv("NLSS_data/Household/secta_cover.csv")
 
 survey_weights <- cover %>% dplyr::select(hhid, wt_final, ea)
 
+# Read in analysis dataset:
+analysis_df <- read_csv("NLSS_data/analysis_df.csv")
+
+# Select only consumption quintile and geography from analysis df: 
+analysis_df <- analysis_df %>% 
+  dplyr::select(hhid, geography, consumption_quintile)
+
 # Join to target_variables
 target_variables <- target_variables %>% 
-  left_join(survey_weights, by = "hhid")
+  left_join(survey_weights, by = "hhid") %>%
+  left_join(analysis_df, by = "hhid")
 
 rm(list = c("cover", "survey_weights"))
 
@@ -149,6 +157,28 @@ ricecomb_reach <- svy_targets %>%
   summarise(n = survey_total()) %>% 
   mutate(percentage = round(n/sum(n)*100, digits = 1)) %>% 
   dplyr::select(rice_combined, percentage)
+
+# Create a table to show proportion of households that answered "Yes" vs. "No" for rice_combined,
+# statified by consumption_quintile:
+rice_reach <- svy_targets %>% 
+  group_by(consumption_quintile) %>% 
+  summarise(n = survey_mean(rice_combined == "Yes"))  %>% 
+  mutate(reach = round(n*100, digits = 1)) %>%
+  dplyr::select(consumption_quintile, reach)
+
+knitr::kable(rice_reach, col.names = c("SEP quintile", "Reach of rice (%)")) %>% 
+  kable_classic(html_font = "helvetica")
+
+# Do the same for coverage: 
+rice_coverage <- svy_targets %>% 
+  group_by(consumption_quintile) %>% 
+  filter(risk_MND == "Yes") %>% 
+  summarise(n = survey_mean(rice_combined == "Yes"))  %>% 
+  mutate(coverage = round(n*100, digits = 1)) %>%
+  dplyr::select(consumption_quintile, coverage)
+
+knitr::kable(rice_coverage, col.names = c("SEP quintile", "Coverage of rice (%)")) %>% 
+  kable_classic(html_font = "helvetica")
 
 # Wheat flour: 
 wheatf_reach <- svy_targets %>% 
@@ -298,6 +328,11 @@ label(target_variables$risk_MND4) <- "4 inadequate Micronutrients"
 label(target_variables$risk_MND5) <- "5 inadequate Micronutrients"
 
 table1(~ risk_MND1 + risk_MND2 + risk_MND3 + risk_MND4 + risk_MND5,
+       data = target_variables)
+
+
+# And stratified by SEP: 
+table1(~ risk_MND1 + risk_MND2 + risk_MND3 + risk_MND4 + risk_MND5 | consumption_quintile,
        data = target_variables)
 
 # Save from Rstudio viewer

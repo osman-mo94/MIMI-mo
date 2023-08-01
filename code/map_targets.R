@@ -179,6 +179,9 @@ svy_targets <- locations_targets %>%
                           weights = wt_final,
                           strata = ea)
 
+options(survey.adjust.domain.lonely=TRUE)
+options(survey.lonely.psu="adjust")
+
 #-------------------------------------------------------------------------------
 
 # REACH
@@ -659,48 +662,48 @@ rm(list = c("coverage_ADM1", "coverage_ADM2", "coverage_legend1", "coverage_lege
 
 #-------------------------------------------------------------------------------
 
-# TESTING ALTERNATIVE COVERAGE THRESHOLDS
-
-# Create alternative thresholds:
-locations_targets$risk_MND1 <- ifelse(locations_targets$n_inadequate >= 1, 
-                                     "Yes", "No")
-
-locations_targets$risk_MND3 <- ifelse(locations_targets$n_inadequate >= 3,
-                                     "Yes", "No")
-
-# Update svy_targets with these new thresholds: 
-svy_targets <- locations_targets %>% 
-  srvyr::as_survey_design(ids = 1, 
-                          weights = wt_final,
-                          strata = ea)
-
-# Calculate coverage using alternative thresholds for "inadequate diet", 
-# only at the ADM2 level for now: 
-
-coverage_lga_alt1 <- svy_targets %>% 
-  filter(risk_MND1 == "Yes") %>% 
-  group_by(state) %>% 
-  summarise(coverage_rice_combined = survey_mean(rice_combined == "Yes"),
-            coverage_wheatf = survey_mean(wheat_flour == "Yes"),
-            coverage_maizef = survey_mean(maize_flour == "Yes"))
-
-coverage_lga_alt3 <- svy_targets %>% 
-  filter(risk_MND3 == "Yes") %>% 
-  group_by(state) %>% 
-  summarise(coverage_rice_combined = survey_mean(rice_combined == "Yes"),
-            coverage_wheatf = survey_mean(wheat_flour == "Yes"),
-            coverage_maizef = survey_mean(maize_flour == "Yes"))
-
-# Merge to shapefiles: 
-nigeria2_coverage_alt1 <- dplyr::left_join(nigeria_2, coverage_lga_alt1, by = "lga")
-nigeria2_coverage_alt3 <- dplyr::left_join(nigeria_2, coverage_lga_alt3, by = "lga")
-
-# Save as new shapefiles:
-# st_write(nigeria2_coverage_alt1, "map_data/outputs/nigeria2_coverage_alt1.shp")
-# st_write(nigeria2_coverage_alt3, "map_data/outputs/nigeria2_coverage_alt3.shp")
-
-# No need to map these currently
-rm(list = c("coverage_lga_alt1", "coverage_lga_alt3"))
+# # TESTING ALTERNATIVE COVERAGE THRESHOLDS
+# 
+# # Create alternative thresholds:
+# locations_targets$risk_MND1 <- ifelse(locations_targets$n_inadequate >= 1, 
+#                                      "Yes", "No")
+# 
+# locations_targets$risk_MND3 <- ifelse(locations_targets$n_inadequate >= 3,
+#                                      "Yes", "No")
+# 
+# # Update svy_targets with these new thresholds: 
+# svy_targets <- locations_targets %>% 
+#   srvyr::as_survey_design(ids = 1, 
+#                           weights = wt_final,
+#                           strata = ea)
+# 
+# # Calculate coverage using alternative thresholds for "inadequate diet", 
+# # only at the ADM2 level for now: 
+# 
+# coverage_lga_alt1 <- svy_targets %>% 
+#   filter(risk_MND1 == "Yes") %>% 
+#   group_by(state) %>% 
+#   summarise(coverage_rice_combined = survey_mean(rice_combined == "Yes"),
+#             coverage_wheatf = survey_mean(wheat_flour == "Yes"),
+#             coverage_maizef = survey_mean(maize_flour == "Yes"))
+# 
+# coverage_lga_alt3 <- svy_targets %>% 
+#   filter(risk_MND3 == "Yes") %>% 
+#   group_by(state) %>% 
+#   summarise(coverage_rice_combined = survey_mean(rice_combined == "Yes"),
+#             coverage_wheatf = survey_mean(wheat_flour == "Yes"),
+#             coverage_maizef = survey_mean(maize_flour == "Yes"))
+# 
+# # Merge to shapefiles: 
+# nigeria2_coverage_alt1 <- dplyr::left_join(nigeria_2, coverage_lga_alt1, by = "lga")
+# nigeria2_coverage_alt3 <- dplyr::left_join(nigeria_2, coverage_lga_alt3, by = "lga")
+# 
+# # Save as new shapefiles:
+# # st_write(nigeria2_coverage_alt1, "map_data/outputs/nigeria2_coverage_alt1.shp")
+# # st_write(nigeria2_coverage_alt3, "map_data/outputs/nigeria2_coverage_alt3.shp")
+# 
+# # No need to map these currently
+# rm(list = c("coverage_lga_alt1", "coverage_lga_alt3"))
 
 #-------------------------------------------------------------------------------
 
@@ -925,6 +928,18 @@ mn_ADM2 <- tmap_arrange(maps_list, ncol = 3, sync = TRUE)
 mn_ADM2
 
 tmap_save(mn_ADM2, "figures/mn_ADM2.png", height = 4.5, width = 7)
+
+#-------------------------------------------------------------------------------
+
+# WRITE FILES REQUIRED FOR MAPPING OF ML OUTPUTS:
+
+# nigeria_1 and nigeria_2:
+st_write(nigeria_1, "map_data/shapefiles_locations/nigeria_1.shp")
+st_write(nigeria_2, "map_data/shapefiles_locations/nigeria_2.shp")
+
+# Household locations:
+write_csv(household_locations, "map_data/shapefiles_locations/household_locations.csv")
+
 
 ################################################################################
 ################################ END OF SCRIPT #################################

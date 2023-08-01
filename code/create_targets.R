@@ -277,6 +277,21 @@ target_variables <- target_variables %>%
 target_variables$risk_MND <- ifelse(target_variables$n_inadequate >= 2, 
                                     "Yes", "No")
 
+# Create an alternative variable for risk of inadequate intake, using all MN's 
+# (except for vitamin A) instead of a selection of 5 MN's: 
+target_variables <- target_variables %>% 
+  mutate(n_inadequate.alt = rowSums(dplyr::select(., thiamine_adequate,
+                                                  riboflavin_adequate, niacin_adequate,
+                                                  vitaminb6_adequate,folate_adequate,
+                                                  vitaminb12_adequate, fe_adequate, 
+                                                  zn_adequate) == "Inadequate"))
+
+# Classify the household at risk of MND if >=2 inadequate: 
+target_variables$risk_MND.alt <- ifelse(target_variables$n_inadequate.alt >= 2, 
+                                    "Yes", "No")
+
+
+
 #-------------------------------------------------------------------------------
 
 # HOUSEHOLD RESIDENTS: 
