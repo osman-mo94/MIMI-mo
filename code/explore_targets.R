@@ -35,14 +35,13 @@ survey_weights <- cover %>% dplyr::select(hhid, wt_final, ea)
 # Read in analysis dataset:
 analysis_df <- read_csv("NLSS_data/analysis_df.csv")
 
-# Select only consumption quintile and geography from analysis df: 
-analysis_df <- analysis_df %>% 
-  dplyr::select(hhid, geography, consumption_quintile)
+# # Select only consumption quintile and geography from analysis df: 
+# analysis_df <- analysis_df %>% 
+#   dplyr::select(hhid, geography, consumption_quintile)
 
 # Join to target_variables
 target_variables <- target_variables %>% 
-  left_join(survey_weights, by = "hhid") %>%
-  left_join(analysis_df, by = "hhid")
+  left_join(survey_weights, by = "hhid") 
 
 rm(list = c("cover", "survey_weights"))
 
@@ -55,6 +54,11 @@ target_variables$wt_final[6613:6615] <- 1093.0268
 target_variables$wt_final[10717:10719] <- 1636.4668
 target_variables$wt_final[16986] <- 1332.726
 target_variables$wt_final[17107] <- 1211.833
+
+# Filter target variables to include only the households selected for our final,
+# analytical sample:
+target_variables <- target_variables %>% 
+  right_join((analysis_df %>% dplyr::select(hhid)), by = "hhid")
 
 # Create tbl_svy object using target_variables dataframe: 
 svy_targets <- target_variables %>% 
@@ -119,8 +123,10 @@ mn_table$variable <- c("Vitamin A", "Thiamine", "Riboflavin", "Niacin",
                        "Vitamin B6", "Folate", "Vitamin B12", "Iron", 
                        "Zinc")
 
-knitr::kable(mn_table, col.names = c("Micronutrient", "Adequate (%)", 
-                                     "Inadequate (%)", "Missing Data (%)")) %>% 
+mn_table <- mn_table %>% dplyr::select(variable, adequate)
+
+knitr::kable(mn_table, col.names = c("Micronutrient", 
+                                     "Households with adequate intake (%)")) %>% 
   kable_classic(html_font = "helvetica")
 
 # Save table from Rstudio viewer.
@@ -129,12 +135,12 @@ knitr::kable(mn_table, col.names = c("Micronutrient", "Adequate (%)",
 
 mn_color <- ghibli_palette("PonyoMedium", 5)
 
-mn_table <- mn_table %>% 
-  filter(variable == "Vitamin A" | variable == "Folate" | 
-           variable == "Vitamin B12" | variable == "Iron" | variable == "Zinc")
+# mn_table <- mn_table %>% 
+#   filter(variable == "Vitamin A" | variable == "Folate" | 
+#            variable == "Vitamin B12" | variable == "Iron" | variable == "Zinc")
 
 adequacy_barplot <- ggplot(data = mn_table, aes(x = reorder(variable, -adequate), y = adequate)) +
-  geom_bar(stat = "identity", fill = mn_color) +
+  geom_bar(stat = "identity") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
   labs(x = "Micronutrient", y = "Adequacy (%)") + theme_pander()
 
@@ -142,8 +148,37 @@ adequacy_barplot <- ggplot(data = mn_table, aes(x = reorder(variable, -adequate)
 #        width = 6, height = 5, dpi = 300)
 
 # Remove objects no longer required: 
-rm(list = c("adequacy_barplot", "mn_adequacy", "mn_table", "svy_mn_adequacy",
-            "mn_color"))
+rm(list = c("adequacy_barplot", "mn_adequacy", "mn_table", "svy_mn_adequacy"))
+
+#-------------------------------------------------------------------------------
+
+# RISK OF INADEQUATE MN INTAKE COMBINED: 
+
+# Get summary statistics to show proportion of households with inadequate intake: 
+
+target_variables$risk_MND <- as.factor(target_variables$risk_MND)
+
+# Create a table that shows a tally of risk_MND in target_variables and associated percentages:
+overall_adequacy <- target_variables %>% 
+  group_by(risk_MND) %>% 
+  summarise(n = n()) %>% 
+  mutate(percentage = round(n/sum(n)*100, digits = 1)) %>% 
+  dplyr::select(risk_MND, n, percentage)
+
+View(overall_adequacy)
+
+# Create a knitr table using "overall_adequacy": 
+knitr::kable(overall_adequacy, col.names = c("Apparently inadequate MN intake", 
+                                             "Number of households", 
+                                             "Percentage of households (%)")) %>% 
+  kable_classic(html_font = "helvetica")
+
+# Plot overall adequacy using ggplot: 
+ggplot(data = overall_adequacy, aes(x = risk_MND, y = percentage, fill = risk_MND)) +
+  geom_bar(stat = "identity", show.legend = F) +
+  scale_fill_manual(values = mn_color[2:3]) +
+  labs(x = "Risk of inadequate micronutrient intake", y = "Percentage of households (%)") +
+  theme_pander()
 
 #-------------------------------------------------------------------------------
 
@@ -160,25 +195,25 @@ ricecomb_reach <- svy_targets %>%
 
 # Create a table to show proportion of households that answered "Yes" vs. "No" for rice_combined,
 # statified by consumption_quintile:
-rice_reach <- svy_targets %>% 
-  group_by(consumption_quintile) %>% 
-  summarise(n = survey_mean(rice_combined == "Yes"))  %>% 
-  mutate(reach = round(n*100, digits = 1)) %>%
-  dplyr::select(consumption_quintile, reach)
-
-knitr::kable(rice_reach, col.names = c("SEP quintile", "Reach of rice (%)")) %>% 
-  kable_classic(html_font = "helvetica")
+# rice_reach <- svy_targets %>% 
+#   group_by(consumption_quintile) %>% 
+#   summarise(n = survey_mean(rice_combined == "Yes"))  %>% 
+#   mutate(reach = round(n*100, digits = 1)) %>%
+#   dplyr::select(consumption_quintile, reach)
+# 
+# knitr::kable(rice_reach, col.names = c("SEP quintile", "Reach of rice (%)")) %>% 
+#   kable_classic(html_font = "helvetica")
 
 # Do the same for coverage: 
-rice_coverage <- svy_targets %>% 
-  group_by(consumption_quintile) %>% 
-  filter(risk_MND == "Yes") %>% 
-  summarise(n = survey_mean(rice_combined == "Yes"))  %>% 
-  mutate(coverage = round(n*100, digits = 1)) %>%
-  dplyr::select(consumption_quintile, coverage)
-
-knitr::kable(rice_coverage, col.names = c("SEP quintile", "Coverage of rice (%)")) %>% 
-  kable_classic(html_font = "helvetica")
+# rice_coverage <- svy_targets %>% 
+#   group_by(consumption_quintile) %>% 
+#   filter(risk_MND == "Yes") %>% 
+#   summarise(n = survey_mean(rice_combined == "Yes"))  %>% 
+#   mutate(coverage = round(n*100, digits = 1)) %>%
+#   dplyr::select(consumption_quintile, coverage)
+# 
+# knitr::kable(rice_coverage, col.names = c("SEP quintile", "Coverage of rice (%)")) %>% 
+#   kable_classic(html_font = "helvetica")
 
 # Wheat flour: 
 wheatf_reach <- svy_targets %>% 
@@ -331,9 +366,9 @@ table1(~ risk_MND1 + risk_MND2 + risk_MND3 + risk_MND4 + risk_MND5,
        data = target_variables)
 
 
-# And stratified by SEP: 
-table1(~ risk_MND1 + risk_MND2 + risk_MND3 + risk_MND4 + risk_MND5 | consumption_quintile,
-       data = target_variables)
+# # And stratified by SEP: 
+# table1(~ risk_MND1 + risk_MND2 + risk_MND3 + risk_MND4 + risk_MND5 | consumption_quintile,
+#        data = target_variables)
 
 # Save from Rstudio viewer
 

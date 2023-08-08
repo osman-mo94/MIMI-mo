@@ -251,14 +251,12 @@ nutrient_intake$fe_adequate <- ifelse(nutrient_intake$fe_in_mg_ai >= 22.4,
 nutrient_intake$zn_adequate <- ifelse(nutrient_intake$zn_in_mg_ai >= 10.2,
                                       "Adequate", "Inadequate")
 
-# Merge nutrient_intake to target_variables:
-target_variables <- target_variables %>% 
-  left_join(nutrient_intake %>% dplyr::select("vitamina_adequate", "thiamine_adequate",
-                                              "riboflavin_adequate", "niacin_adequate",
-                                              "vitaminb6_adequate","folate_adequate",
-                                              "vitaminb12_adequate", "fe_adequate", 
-                                              "zn_adequate", "hhid"),
-            by = "hhid")
+nutrient_intake <- nutrient_intake %>% dplyr::select(hhid, vitamina_adequate, 
+                                                     thiamine_adequate, riboflavin_adequate,
+                                                     niacin_adequate, vitaminb6_adequate,
+                                                     folate_adequate, vitaminb12_adequate,
+                                                     fe_adequate, zn_adequate) %>% 
+  drop_na()
 
 #-------------------------------------------------------------------------------
 
@@ -268,29 +266,30 @@ target_variables <- target_variables %>%
 # based on nutritional intake above: 
 
 # For each household, count the number of these micronutrients for which intake is inadequate:
-target_variables <- target_variables %>% 
-  mutate(n_inadequate = rowSums(dplyr::select(., vitamina_adequate, folate_adequate,
+nutrient_intake <- nutrient_intake %>% 
+  mutate(n_inadequate = rowSums(dplyr::select(., vitamina_adequate, thiamine_adequate,
+                                              riboflavin_adequate, niacin_adequate,
+                                              vitaminb6_adequate, folate_adequate,
                                               vitaminb12_adequate,fe_adequate, 
                                               zn_adequate) == "Inadequate"))
 
+
 # Classify the household at risk of MND if >=2 inadequate: 
-target_variables$risk_MND <- ifelse(target_variables$n_inadequate >= 2, 
+nutrient_intake$risk_MND <- ifelse(nutrient_intake$n_inadequate >= 2, 
                                     "Yes", "No")
 
-# Create an alternative variable for risk of inadequate intake, using all MN's 
-# (except for vitamin A) instead of a selection of 5 MN's: 
+# Merge nutrient_intake to target_variables:
 target_variables <- target_variables %>% 
-  mutate(n_inadequate.alt = rowSums(dplyr::select(., thiamine_adequate,
-                                                  riboflavin_adequate, niacin_adequate,
-                                                  vitaminb6_adequate,folate_adequate,
-                                                  vitaminb12_adequate, fe_adequate, 
-                                                  zn_adequate) == "Inadequate"))
+  left_join(nutrient_intake, 
+            by = "hhid")
 
-# Classify the household at risk of MND if >=2 inadequate: 
-target_variables$risk_MND.alt <- ifelse(target_variables$n_inadequate.alt >= 2, 
-                                    "Yes", "No")
+which(is.na(target_variables$risk_MND))
 
+#Identify unmatched records: 
+unmatched <- nutrient_intake %>% anti_join(target_variables, by = "hhid")
 
+# Note that there are 3 records in the nutrient intake data that are not among 
+# the households that completed the interview.
 
 #-------------------------------------------------------------------------------
 
@@ -310,7 +309,7 @@ target_variables <- target_variables %>%
   rename("n_residents" = "n")
 
 # Remove objects that are not required further: 
-rm(list = c("cover", "food_consumption", "nutrient_intake", "roster"))
+rm(list = c("cover", "food_consumption", "nutrient_intake", "roster", "unmatched"))
 
 ################################################################################
 ################################ END OF SCRIPT #################################

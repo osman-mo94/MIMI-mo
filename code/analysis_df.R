@@ -31,6 +31,10 @@ source("code/predictive_inputs.R")
 analysis_df <- target_variables %>% 
   dplyr::select(hhid, rice_combined, wheat_flour, maize_flour, risk_MND)
 
+# Filter analysis data-frame to include only households that have all targets
+# available: 
+analysis_df <- analysis_df %>% drop_na()
+
 # Join desired predictive inputs: 
 analysis_df <- analysis_df %>% 
   left_join(predictive_inputs, 

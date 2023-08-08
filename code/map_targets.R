@@ -179,6 +179,7 @@ svy_targets <- locations_targets %>%
                           weights = wt_final,
                           strata = ea)
 
+# These settings need to be implemented to allow analysis of tbl_svy objects:
 options(survey.adjust.domain.lonely=TRUE)
 options(survey.lonely.psu="adjust")
 
@@ -367,7 +368,7 @@ nigeria2_reach <- dplyr::left_join(nigeria_2, reach_lga, by = "lga")
 
 # ADM1
 
-breaks <- c(0, 0.000001, 0.3, 0.6, 0.8, 1)
+breaks <- c(0, 0.25, 0.5, 0.75, 1)
 
 # Rice
 rice_ADM1 <- tm_shape(nigeria1_reach) + 
@@ -404,7 +405,7 @@ reach_legend1 <- tm_shape(nigeria1_reach) +
   tm_fill(col = "reach_maizef", breaks = breaks, palette = "Blues",
           title = "Reach (% of households with access 
 to the fortification vehicle)",
-          labels = c("0", "0-30%", "30-60%", "60-80%", "80-100%"),
+          labels = c("0-25%", "25-50%", "50-75%", "75-100%"),
           textNA = "Missing Data",
           colorNA = "gray35") +
   tm_layout(legend.only = T,
@@ -424,7 +425,7 @@ reach_ADM1 <- tmap_arrange(reach_ADM1, ncol = 2, sync = TRUE)
 
 reach_ADM1
 
-tmap_save(reach_ADM1, "figures/reach_ADM1.png", height = 5, width = 5)
+tmap_save(reach_ADM1, "figures/targets/reach_ADM1.png", height = 5, width = 5)
 
 
 # ADM2
@@ -467,7 +468,7 @@ reach_legend2 <- tm_shape(nigeria2_reach) +
   tm_fill(col = "reach_maizef", breaks = breaks, palette = "Blues",
           title = "Reach (% of households with access 
 to the fortification vehicle)",
-          labels = c("0", "0-30%", "30-60%", "60-80%", "80-100%"),
+          labels = c("0-25%", "25-50%", "50-75%", "75-100%"),
           textNA = "Missing Data",
           colorNA = "gray35") +
   tm_layout(legend.only = T,
@@ -487,7 +488,7 @@ reach_ADM2 <- tmap_arrange(reach_ADM2, ncol = 2, sync = TRUE)
 
 reach_ADM2
 
-tmap_save(reach_ADM2, "figures/reach_ADM2.png", height = 5, width = 5)
+tmap_save(reach_ADM2, "figures/targets/reach_ADM2.png", height = 5, width = 5)
 
 #-------------------------------------------------------------------------------
 
@@ -529,7 +530,7 @@ nigeria2_coverage <- dplyr::left_join(nigeria_2, coverage_lga, by = "lga")
 
 # ADM1
 
-breaks <- c(0, 0.000001, 0.3, 0.6, 0.8, 1.0000001)
+breaks <- c(0, 0.25, 0.5, 0.75, 1)
 
 # Rice
 rice_ADM1cov <- tm_shape(nigeria1_coverage) + 
@@ -566,7 +567,7 @@ coverage_legend1 <- tm_shape(nigeria1_coverage) +
   tm_fill(col = "coverage_maizef", breaks = breaks, palette = "Blues",
           title = "Coverage (% of households with apparently inadequate
 diet with access to the fortification vehicle)",
-          labels = c("0", "0-30%", "30-60%", "60-80%", "80-100%"),
+          labels = c("0-25%", "25-50%", "50-75%", "75-100%"),
           textNA = "Missing Data",
           colorNA = "gray35") +
   tm_layout(legend.only = T,
@@ -586,7 +587,7 @@ coverage_ADM1 <- tmap_arrange(coverage_ADM1, ncol = 2, sync = TRUE)
 
 coverage_ADM1
 
-tmap_save(coverage_ADM1, "figures/coverage_ADM1.png", height = 5, width = 5)
+tmap_save(coverage_ADM1, "figures/targets/coverage_ADM1.png", height = 5, width = 5)
 
 
 # ADM2
@@ -629,7 +630,7 @@ coverage_legend2 <- tm_shape(nigeria2_coverage) +
   tm_fill(col = "coverage_maizef", breaks = breaks, palette = "Blues",
           title = "Coverage (% of households with apparently inadequate
 diet with access to the fortification vehicle)",
-          labels = c("0", "0-30%", "30-60%", "60-80%", "80-100%"),
+          labels = c("0-25%", "25-50%", "50-75%", "75-100%"),
           textNA = "Missing Data",
           colorNA = "gray35") +
   tm_layout(legend.only = T,
@@ -649,7 +650,7 @@ coverage_ADM2 <- tmap_arrange(coverage_ADM2, ncol = 2, sync = TRUE)
 
 coverage_ADM2
 
-tmap_save(coverage_ADM2, "figures/coverage_ADM2.png", height = 5, width = 5)
+tmap_save(coverage_ADM2, "figures/targets/coverage_ADM2.png", height = 5, width = 5)
 
 # Remove objects that are no longer required: 
 rm(list = c("coverage_ADM1", "coverage_ADM2", "coverage_legend1", "coverage_legend2",
@@ -720,31 +721,40 @@ svy_targets %>%
 
 micronutrients_ADM1 <- svy_targets %>% 
   group_by(state) %>% 
-  summarise(vitamina_inadequacy = survey_mean(vitamina_adequate == "Inadequate", 
+  summarise(vitamina_adequacy = survey_mean(vitamina_adequate == "Adequate", 
                                             na.rm = TRUE),
-            folate_inadequacy = survey_mean(folate_adequate == "Inadequate",
+            thiamine_adequacy = survey_mean(thiamine_adequate == "Adequate",
+                                            na.rm = TRUE),
+            riboflavin_adequacy = survey_mean(riboflavin_adequate == "Adequate",
+                                             na.rm = TRUE),
+            niacin_adequacy = survey_mean(niacin_adequate == "Adequate",
                                           na.rm = TRUE),
-            zinc_inadequacy = survey_mean(zn_adequate == "Inadequate",
+            b6_adequacy = survey_mean(vitaminb6_adequate == "Adequate", 
+                                      na.rm = TRUE),
+            folate_adequacy = survey_mean(folate_adequate == "Adequate",
+                                          na.rm = TRUE),
+            zinc_adequacy = survey_mean(zn_adequate == "Adequate",
                                         na.rm = TRUE),
-            iron_inadequacy = survey_mean(fe_adequate == "Inadequate",
+            iron_adequacy = survey_mean(fe_adequate == "Adequate",
                                         na.rm = TRUE),
-            b12_inadequacy = survey_mean(vitaminb12_adequate == "Inadequate",
+            b12_adequacy = survey_mean(vitaminb12_adequate == "Adequate",
                                        na.rm = TRUE))
 
 micronutrients_ADM1 <- micronutrients_ADM1 %>% 
-  dplyr::select(state, vitamina_inadequacy, folate_inadequacy, zinc_inadequacy, 
-                iron_inadequacy, b12_inadequacy)
+  dplyr::select(state, vitamina_adequacy, thiamine_adequacy, riboflavin_adequacy,
+                niacin_adequacy, b6_adequacy, folate_adequacy, zinc_adequacy, 
+                iron_adequacy, b12_adequacy)
 
 # Merge to shapefiles: 
 micronutrients_ADM1 <- dplyr::left_join(nigeria_1, micronutrients_ADM1, by = "state")
 
 # Map adequacy of MN's at ADM1 level
 
-breaks <- c(0, 0.000001, 0.3, 0.6, 0.8, 1.0000001)
+breaks <- c(0, 0.25, 0.5, 0.75, 1)
 
 # Vitamin A:
 vitamina_map <- tm_shape(micronutrients_ADM1) + 
-  tm_fill(col = "vitamina_inadequacy", breaks = breaks, palette = "Blues") +
+  tm_fill(col = "vitamina_adequacy", breaks = breaks, palette = "Blues") +
   tm_layout(main.title = "Vitamin A", frame = F,
             main.title.size = 0.8) +
   tm_borders(col = "black", lwd = 0.7) +
@@ -828,20 +838,29 @@ rm(list = c("b12_map", "folate_map", "iron_map", "map_legend", "maps_list",
 
 micronutrients_ADM2 <- svy_targets %>% 
   group_by(lga) %>% 
-  summarise(vitamina_inadequacy = survey_mean(vitamina_adequate == "Inadequate", 
+  summarise(vitamina_adequacy = survey_mean(vitamina_adequate == "Adequate", 
                                             na.rm = TRUE),
-            folate_inadequacy = survey_mean(folate_adequate == "Inadequate",
+            thiamine_adequacy = survey_mean(thiamine_adequate == "Adequate",
+                                            na.rm = TRUE),
+            riboflavin_adequacy = survey_mean(riboflavin_adequate == "Adequate",
+                                              na.rm = TRUE),
+            niacin_adequacy = survey_mean(niacin_adequate == "Adequate",
                                           na.rm = TRUE),
-            zinc_inadequacy = survey_mean(zn_adequate == "Inadequate",
+            b6_adequacy = survey_mean(vitaminb6_adequate == "Adequate", 
+                                      na.rm = TRUE),
+            folate_adequacy = survey_mean(folate_adequate == "Adequate",
+                                          na.rm = TRUE),
+            zinc_adequacy = survey_mean(zn_adequate == "Adequate",
                                         na.rm = TRUE),
-            iron_inadequacy = survey_mean(fe_adequate == "Inadequate",
+            iron_adequacy = survey_mean(fe_adequate == "Adequate",
                                         na.rm = TRUE),
-            b12_inadequacy = survey_mean(vitaminb12_adequate == "Inadequate",
+            b12_adequacy = survey_mean(vitaminb12_adequate == "Adequate",
                                        na.rm = TRUE))
 
 micronutrients_ADM2 <- micronutrients_ADM2 %>% 
-  dplyr::select(lga, vitamina_inadequacy, folate_inadequacy, zinc_inadequacy, 
-                iron_inadequacy, b12_inadequacy)
+  dplyr::select(lga, vitamina_adequacy, thiamine_adequacy, riboflavin_adequacy,
+                niacin_adequacy, b6_adequacy, folate_adequacy, zinc_adequacy, 
+                iron_adequacy, b12_adequacy)
 
 # Merge to shapefiles: 
 micronutrients_ADM2 <- dplyr::left_join(nigeria_2, micronutrients_ADM2, by = "lga")
@@ -850,7 +869,7 @@ micronutrients_ADM2 <- dplyr::left_join(nigeria_2, micronutrients_ADM2, by = "lg
 
 # Vitamin A:
 vitamina_ADM2 <- tm_shape(micronutrients_ADM2) + 
-  tm_fill(col = "vitamina_inadequacy", breaks = breaks, palette = "Blues",
+  tm_fill(col = "vitamina_adequacy", breaks = breaks, palette = "Blues",
           colorNA = "gray35") +
   tm_layout(main.title = "Vitamin A", frame = F,
             main.title.size = 0.8) +
@@ -859,9 +878,53 @@ vitamina_ADM2 <- tm_shape(micronutrients_ADM2) +
 
 vitamina_ADM2
 
+# Thiamine:
+thiamine_ADM2 <- tm_shape(micronutrients_ADM2) + 
+  tm_fill(col = "thiamine_adequacy", breaks = breaks, palette = "Blues",
+          colorNA = "gray35") +
+  tm_layout(main.title = "Thiamine", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.5) +
+  tm_legend(show = F)
+
+thiamine_ADM2
+
+# Riboflavin: 
+riboflavin_ADM2 <- tm_shape(micronutrients_ADM2) + 
+  tm_fill(col = "riboflavin_adequacy", breaks = breaks, palette = "Blues",
+          colorNA = "gray35") +
+  tm_layout(main.title = "Riboflavin", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.5) +
+  tm_legend(show = F)
+
+riboflavin_ADM2
+
+# Niacin: 
+niacin_ADM2 <- tm_shape(micronutrients_ADM2) + 
+  tm_fill(col = "niacin_adequacy", breaks = breaks, palette = "Blues",
+          colorNA = "gray35") +
+  tm_layout(main.title = "Niacin", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.5) +
+  tm_legend(show = F)
+
+niacin_ADM2
+
+# Vitamin B6: 
+vitaminb6_ADM2 <- tm_shape(micronutrients_ADM2) + 
+  tm_fill(col = "b6_adequacy", breaks = breaks, palette = "Blues",
+          colorNA = "gray35") +
+  tm_layout(main.title = "Vitamin B6", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.5) +
+  tm_legend(show = F)
+
+vitaminb6_ADM2
+
 # Folate
 folate_ADM2 <- tm_shape(micronutrients_ADM2) + 
-  tm_fill(col = "folate_inadequacy", breaks = breaks, palette = "Blues",
+  tm_fill(col = "folate_adequacy", breaks = breaks, palette = "Blues",
           colorNA = "gray35") +
   tm_layout(main.title = "Folate", frame = F,
             main.title.size = 0.8) +
@@ -870,9 +933,20 @@ folate_ADM2 <- tm_shape(micronutrients_ADM2) +
 
 folate_ADM2
 
+# B12: 
+b12_ADM2 <- tm_shape(micronutrients_ADM2) + 
+  tm_fill(col = "b12_adequacy", breaks = breaks, palette = "Blues",
+          colorNA = "gray35") +
+  tm_layout(main.title = "Vitamin B12", frame = F,
+            main.title.size = 0.8) +
+  tm_borders(col = "black", lwd = 0.5) + 
+  tm_legend(show = F)
+
+b12_ADM2
+
 # Zinc: 
 zinc_ADM2 <- tm_shape(micronutrients_ADM2) + 
-  tm_fill(col = "zinc_inadequacy", breaks = breaks, palette = "Blues",
+  tm_fill(col = "zinc_adequacy", breaks = breaks, palette = "Blues",
           colorNA = "gray35") +
   tm_layout(main.title = "Zinc", frame = F,
             main.title.size = 0.8) +
@@ -883,7 +957,7 @@ zinc_ADM2
 
 # Iron: 
 iron_ADM2 <- tm_shape(micronutrients_ADM2) + 
-  tm_fill(col = "iron_inadequacy", breaks = breaks, palette = "Blues",
+  tm_fill(col = "iron_adequacy", breaks = breaks, palette = "Blues",
           colorNA = "gray35") +
   tm_layout(main.title = "Iron", frame = F,
             main.title.size = 0.8) +
@@ -892,22 +966,11 @@ iron_ADM2 <- tm_shape(micronutrients_ADM2) +
 
 iron_ADM2
 
-# B12: 
-b12_ADM2 <- tm_shape(micronutrients_ADM2) + 
-  tm_fill(col = "b12_inadequacy", breaks = breaks, palette = "Blues",
-          colorNA = "gray35") +
-  tm_layout(main.title = "Vitamin B12", frame = F,
-            main.title.size = 0.8) +
-  tm_borders(col = "black", lwd = 0.5) + 
-  tm_legend(show = F)
-
-b12_ADM2
-
 # legend: 
 ADM2_legend <- tm_shape(micronutrients_ADM2) + 
-  tm_fill(col = "b12_inadequacy", breaks = breaks, palette = "Blues",
-          title = "Micronutrient Inadequacy",
-          labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"),
+  tm_fill(col = "b12_adequacy", breaks = breaks, palette = "Blues",
+          title = "Micronutrient Adequacy",
+          labels = c("0-25%", "25-50%", "50-75%", "75-100"),
           textNA = "Missing Data",
           colorNA = "gray35") +
   tm_layout(legend.only = T,
@@ -921,13 +984,16 @@ ADM2_legend
 
 # Integrate these 5 maps and legend into a single figure: 
 
-maps_list <- list(vitamina_ADM2, folate_ADM2, zinc_ADM2, iron_ADM2, b12_ADM2, ADM2_legend)
+maps_list <- list(vitamina_ADM2, thiamine_ADM2, riboflavin_ADM2, niacin_ADM2,
+                  vitaminb6_ADM2, folate_ADM2, b12_ADM2, zinc_ADM2, iron_ADM2, 
+                  ADM2_legend)
 
-mn_ADM2 <- tmap_arrange(maps_list, ncol = 3, sync = TRUE)
+mn_ADM2 <- tmap_arrange(maps_list, ncol = 2, sync = TRUE)
 
 mn_ADM2
 
-tmap_save(mn_ADM2, "figures/mn_ADM2.png", height = 4.5, width = 7)
+tmap_save(mn_ADM2, "figures/targets/mn_ADM2.png", height = 7, width = 4.5,
+          dpi = 600)
 
 #-------------------------------------------------------------------------------
 
