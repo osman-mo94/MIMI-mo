@@ -39,7 +39,18 @@ agriculture <- read_csv("NLSS_data/Household/sect18_agriculture.csv")
 # data-frame: 
 
 predictive_inputs <- cover %>% filter(interview_result == 1) %>% 
-  select(hhid)
+  dplyr::select(hhid)
+
+# Further filter this df to include only those who have nutrient intake data: 
+nutrient_data <- read_csv("nutrient_data/nga18_ai_basecase_MO_v1.csv")
+
+nutrient_data <- nutrient_data %>% drop_na()
+
+predictive_inputs <- predictive_inputs %>% 
+  inner_join(nutrient_data, by = "hhid") %>% 
+  dplyr::select(hhid)
+
+rm(nutrient_data)
 
 #-------------------------------------------------------------------------------
 
@@ -64,20 +75,22 @@ class(predictive_inputs$proportion_male)
 
 #-------------------------------------------------------------------------------
 
+# I have removed this section for creating variables based on religion:
+
 # RELIGION: 
 
-predictive_inputs <- predictive_inputs %>% 
-  left_join(roster %>% 
-              group_by(hhid) %>% 
-              summarise(proportion_christian = sum(s01q11 == 1, na.rm = T)/ n(),
-                        proportion_muslim = sum(s01q11 == 2, na.rm = T)/ n(),
-                        proportion_traditional = sum(s01q11 == 3, na.rm = T)/ n()), 
-            by = "hhid")
-
-# Ensure that variables are in correct format: 
-class(predictive_inputs$proportion_christian)
-class(predictive_inputs$proportion_muslim)
-class(predictive_inputs$proportion_traditional)
+# predictive_inputs <- predictive_inputs %>% 
+#   left_join(roster %>% 
+#               group_by(hhid) %>% 
+#               summarise(proportion_christian = sum(s01q11 == 1, na.rm = T)/ n(),
+#                         proportion_muslim = sum(s01q11 == 2, na.rm = T)/ n(),
+#                         proportion_traditional = sum(s01q11 == 3, na.rm = T)/ n()), 
+#             by = "hhid")
+# 
+# # Ensure that variables are in correct format: 
+# class(predictive_inputs$proportion_christian)
+# class(predictive_inputs$proportion_muslim)
+# class(predictive_inputs$proportion_traditional)
 
 #-------------------------------------------------------------------------------
 
@@ -149,7 +162,7 @@ assets_filtered <- assets %>%
   filter(s10q01 == 1) %>%
   dplyr::select(hhid, asset, s10q01) %>%
   pivot_wider(names_from = asset, values_from = s10q01) %>% 
-  select(- "NA")
+  dplyr::select(- "NA")
 
 # Indicate non-ownership of items with a value of 0
 assets_filtered <- assets_filtered %>% 
@@ -162,7 +175,15 @@ assets_filtered <- assets_filtered %>%
 
 # Filter for selected assets:
 assets_filtered <- assets_filtered %>% 
-  select(hhid, radio, tv, smart_phones, reg_mobile_phone, fridge, cars_vehicles)
+  dplyr::select(hhid, radio, tv, smart_phones, reg_mobile_phone, fridge, cars_vehicles)
+
+# Combine smart_phones and reg_mobile_phone into one variable:
+assets_filtered <- assets_filtered %>% 
+  mutate(mobile_phone = dplyr::case_when(
+    smart_phones == 1 ~ 1,
+    reg_mobile_phone == 1 ~ 1,
+    TRUE ~ 0)) %>% 
+  dplyr::select(-smart_phones, -reg_mobile_phone)
 
 # Join to predictive_inputs df
 predictive_inputs <- predictive_inputs %>%
@@ -204,12 +225,19 @@ housing <- housing %>%
 #   dwelling_type == 10 ~ "incomplete building",
 #   TRUE ~ NA_character_
 # )) %>% 
-  mutate(dwelling_tenure = case_when(
-    dwelling_tenure == 1 ~ "4",
-    dwelling_tenure == 2 ~ "2", 
-    dwelling_tenure == 3 ~ "1", 
-    dwelling_tenure == 4 ~ "3"
+  mutate(dwelling_free = case_when(
+    dwelling_tenure == 2 ~ 1,
+    dwelling_tenure == 3 ~ 1,
+    TRUE ~ 0 
   )) %>% 
+  mutate(dwelling_rented = case_when(
+    dwelling_tenure == 4 ~ 1,
+    TRUE ~ 0 
+  )) %>%
+  mutate(dwelling_owned = case_when(
+    dwelling_tenure == 1 ~ 1,
+    TRUE ~ 0 
+  )) %>%
   mutate(material_floor = case_when(
     material_floor %in% c(1:2) ~ "0", 
     material_floor %in% c(3:7) ~ "1",
@@ -221,12 +249,24 @@ housing <- housing %>%
     water_source %in% c(7, 9, 13, 17) ~ "0", 
     TRUE ~ NA_character_
   )) %>% 
-  mutate(toilet_facility = case_when(
-    toilet_facility %in% c(1, 2, 3, 6, 7, 9) ~ "2", 
-    toilet_facility %in% c(4, 5, 8, 10, 11, 14) ~ "1", 
-    toilet_facility == 12 ~ "0",
-    TRUE ~ NA_character_
+  mutate(open_defecaetion = case_when(
+    toilet_facility == 12 ~ 1,
+    TRUE ~ 0
+  )) %>%
+  mutate(toilet_unimproved = case_when(
+    toilet_facility %in% c(4, 5, 8, 10, 11, 14) ~ 1, 
+    TRUE ~ 0
+  )) %>%
+  mutate(toilet_improved = case_when(
+    toilet_facility %in% c(1, 2, 3, 6, 7, 9) ~ 1, 
+    TRUE ~ 0
   ))
+
+  # Select only required columns from "housing": 
+housing <- housing %>%
+  dplyr::select(hhid, material_floor, n_rooms, electricity, water_source, 
+                dwelling_free, dwelling_rented, dwelling_owned, 
+                open_defecaetion, toilet_unimproved, toilet_improved)
 
 # Ensure all variables in housing are numeric:
 housing <- housing %>% mutate(across(-hhid, ~as.numeric(.)))
@@ -267,7 +307,7 @@ predictive_inputs <- predictive_inputs %>%
 # OWNERSHIP OR ACCESS TO AGRICULTURAL LAND
 
 # Select required columns from agriculture df and rename:
-agriculture <- agriculture %>% select(hhid, s18q01)
+agriculture <- agriculture %>% dplyr::select(hhid, s18q01)
 names(agriculture) <- c("hhid", "agricultural_land")
 
 # Indicate no access to agricultural land with 0, and 1 for access: 
@@ -310,7 +350,7 @@ education <- education %>%
             by = c("hhid", "indiv"))
 
 # Select columns of interest from education dataframe: 
-education <- education %>% select(hhid, indiv, adult, s02q08) %>% 
+education <- education %>% dplyr::select(hhid, indiv, adult, s02q08) %>% 
   rename(education_attainment = s02q08)
 
 # If individuals answered "other", code as missing:
@@ -347,29 +387,30 @@ rm(education)
 
 #-------------------------------------------------------------------------------
 
-# INCOME:
+# Income section below not used.
+# # INCOME:
 
-# (all income sources combined)
-household_income <- income %>% 
-  group_by(hhid) %>% 
-  summarise(total_income = sum(s13q02, na.rm = T))
+# # (all income sources combined)
+# household_income <- income %>% 
+#   group_by(hhid) %>% 
+#   summarise(total_income = sum(s13q02, na.rm = T))
 
-# Many households did not report their income, code these as NA:
-household_income$total_income[household_income$total_income == 0] <- NA
+# # Many households did not report their income, code these as NA:
+# household_income$total_income[household_income$total_income == 0] <- NA
 
-# Join household income to predictive_inputs:
-predictive_inputs <- predictive_inputs %>% 
-  left_join(household_income, by = "hhid")
+# # Join household income to predictive_inputs:
+# predictive_inputs <- predictive_inputs %>% 
+#   left_join(household_income, by = "hhid")
 
-# Remove household_income df (not required further):
-rm(list = c("household_income", "income"))
+# # Remove household_income df (not required further):
+# rm(list = c("household_income", "income"))
 
-# See how many households are missing data on total income: 
-length(which(is.na(predictive_inputs$total_income))) 
+# # See how many households are missing data on total income: 
+# length(which(is.na(predictive_inputs$total_income))) 
 
-# Given that the overwhelming majority of households are missing data on income, 
-# I will omit this as a predictive input.
-predictive_inputs <- predictive_inputs %>% dplyr::select(-total_income)
+# # Given that the overwhelming majority of households are missing data on income, 
+# # I will omit this as a predictive input.
+# predictive_inputs <- predictive_inputs %>% dplyr::select(-total_income)
 
 #-------------------------------------------------------------------------------
 
@@ -400,7 +441,7 @@ labour$trainee_apprentice[is.na(labour$trainee_apprentice)] <- 0
 labour <- labour %>% 
   left_join(roster %>% dplyr::select(hhid, indiv, adult),
             by = c("hhid", "indiv")) %>% 
-  filter(adult == "Yes") %>% select(-adult)
+  filter(adult == "Yes") %>% dplyr::select(-adult)
 
 # Now create variables to indicate proportion of adults in each household who 
 # are working in each type of employment: 
@@ -433,22 +474,24 @@ rm(list = c("cover", "roster"))
 # FINALISE DATAFRAME
 
 # Remove variables that are no longer required: 
-predictive_inputs <- predictive_inputs %>% select(-c("n_residents", "n_rooms"))
+predictive_inputs <- predictive_inputs %>% dplyr::select(-c("n_residents", 
+                                                            "n_rooms"))
 
 # Re-order variables: 
-new_order <- c("hhid", "dwelling_tenure", "material_floor", "electricity", 
-               "water_source", "toilet_facility", "n_per_room", "agricultural_land",  
-               "radio", "tv", "smart_phones", "reg_mobile_phone", "fridge", 
-               "cars_vehicles", "proportion_male", "proportion_christian", 
-               "proportion_muslim","proportion_traditional", "proportion_primary", 
-               "proportion_secondary", "proportion_higher", "proportion_wage_salary", 
-               "proportion_own_agriculture","proportion_own_NFE", 
-               "proportion_trainee_apprentice", "geography", "total_consumption", 
-               "consumption_quintile")
+new_order <- c("hhid", "geography", "total_consumption", "consumption_quintile",
+               "radio", "tv", "fridge", "cars_vehicles", "mobile_phone",
+               "dwelling_free", "dwelling_rented", "dwelling_owned",
+               "material_floor", "electricity", "water_source",
+               "open_defecaetion", "toilet_unimproved",
+               "toilet_improved", "n_per_room", "agricultural_land",
+               "proportion_male", "proportion_primary", "proportion_secondary",
+               "proportion_higher", "proportion_wage_salary",
+               "proportion_own_agriculture", "proportion_own_NFE",
+               "proportion_trainee_apprentice")
 
 predictive_inputs <- predictive_inputs[,new_order]
 
-rm(new_order)
+rm(list = c("new_order", "income"))
 
 ################################################################################
 ############################## END OF SCRIPT ###################################

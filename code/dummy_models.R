@@ -4,7 +4,7 @@
 
 # Install and load required packages:
 rq_packages <- c("tidyverse", "caret", "basemodels", "ggplot2", "mice",
-                 "splitTools", "ROSE")
+                 "splitTools")
 
 installed_packages <- rq_packages %in% rownames(installed.packages())
 if (any(installed_packages == FALSE)) {

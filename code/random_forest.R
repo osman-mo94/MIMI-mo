@@ -80,14 +80,15 @@ class(rice_train$rice_combined)
 registerDoMC(cores = 4)
 
 # Fit default model: 
-RF_default <- randomForest(rice_combined ~ dwelling_tenure + material_floor + electricity +
-                             water_source + toilet_facility + n_per_room + agricultural_land +
-                             radio + tv + smart_phones + reg_mobile_phone + fridge + 
-                             cars_vehicles + proportion_male + proportion_christian + 
-                             proportion_muslim + proportion_traditional + proportion_primary + 
+RF_default <- randomForest(rice_combined ~ geography + total_consumption + radio + tv +
+                             fridge + cars_vehicles + mobile_phone + dwelling_free +
+                             dwelling_rented + dwelling_owned + material_floor + 
+                             electricity + water_source + open_defecaetion + 
+                             toilet_unimproved + toilet_improved + n_per_room +
+                             agricultural_land + proportion_male + proportion_primary +
                              proportion_secondary + proportion_higher + 
                              proportion_wage_salary + proportion_own_agriculture + 
-                             proportion_own_NFE + proportion_trainee_apprentice,
+                             proportion_own_NFE,
                            data = rice_train)
 
 
@@ -118,14 +119,15 @@ registerDoMC(cores = 4) # Parallel cores
 
 set.seed(450) # Set seed
 
-rf_random <- train(rice_combined ~ dwelling_tenure + material_floor + electricity +
-                     water_source + toilet_facility + n_per_room + agricultural_land +
-                     radio + tv + smart_phones + reg_mobile_phone + fridge + 
-                     cars_vehicles + proportion_male + proportion_christian + 
-                     proportion_muslim + proportion_traditional + proportion_primary + 
+rf_random <- train(rice_combined ~ geography + total_consumption + radio + tv +
+                     fridge + cars_vehicles + mobile_phone + dwelling_free +
+                     dwelling_rented + dwelling_owned + material_floor + 
+                     electricity + water_source + open_defecaetion + 
+                     toilet_unimproved + toilet_improved + n_per_room +
+                     agricultural_land + proportion_male + proportion_primary +
                      proportion_secondary + proportion_higher + 
                      proportion_wage_salary + proportion_own_agriculture + 
-                     proportion_own_NFE + proportion_trainee_apprentice,
+                     proportion_own_NFE,
                    data = rice_train,
                    method = "rf", 
                    metric = "ROC",
@@ -193,14 +195,15 @@ set.seed(123)
 registerDoMC(cores = 4) # Run using 4 parallel cores
 
 # Train models:
-RF_tuning <- train(rice_combined ~ dwelling_tenure + material_floor + electricity +
-                     water_source + toilet_facility + n_per_room + agricultural_land +
-                     radio + tv + smart_phones + reg_mobile_phone + fridge + 
-                     cars_vehicles + proportion_male + proportion_christian + 
-                     proportion_muslim + proportion_traditional + proportion_primary + 
+RF_tuning <- train(rice_combined ~ geography + total_consumption + radio + tv +
+                     fridge + cars_vehicles + mobile_phone + dwelling_free +
+                     dwelling_rented + dwelling_owned + material_floor + 
+                     electricity + water_source + open_defecaetion + 
+                     toilet_unimproved + toilet_improved + n_per_room +
+                     agricultural_land + proportion_male + proportion_primary +
                      proportion_secondary + proportion_higher + 
                      proportion_wage_salary + proportion_own_agriculture + 
-                     proportion_own_NFE + proportion_trainee_apprentice,
+                     proportion_own_NFE,
                    data = rice_train,
                    method = customRF, 
                    metric = "ROC",
@@ -225,21 +228,24 @@ optimal_mtry <- RF_tuning$finalModel$mtry
 
 # FIT A FINAL TUNED MODEL: 
 
-RF_tuned <- train(rice_combined ~ dwelling_tenure + material_floor + electricity +
-                                 water_source + toilet_facility + n_per_room + agricultural_land +
-                                 radio + tv + smart_phones + reg_mobile_phone + fridge + 
-                                 cars_vehicles + proportion_male + proportion_christian + 
-                                 proportion_muslim + proportion_traditional + proportion_primary + 
-                                 proportion_secondary + proportion_higher + 
-                                 proportion_wage_salary + proportion_own_agriculture + 
-                                 proportion_own_NFE + proportion_trainee_apprentice,
-                               data = rice_train,
-                               method = "rf", 
-                               metric = "ROC",
-                               num.trees = optimal_ntree,
-                               tuneGrid = expand.grid(mtry = c(optimal_mtry)),
-                               trControl = RFctrl,
-                               na.action = na.omit)
+set.seed(222)
+
+RF_tuned <- train(rice_combined ~ geography + total_consumption + radio + tv +
+                    fridge + cars_vehicles + mobile_phone + dwelling_free +
+                    dwelling_rented + dwelling_owned + material_floor + 
+                    electricity + water_source + open_defecaetion + 
+                    toilet_unimproved + toilet_improved + n_per_room +
+                    agricultural_land + proportion_male + proportion_primary +
+                    proportion_secondary + proportion_higher + 
+                    proportion_wage_salary + proportion_own_agriculture + 
+                    proportion_own_NFE,
+                  data = rice_train,
+                  method = "rf", 
+                  metric = "ROC",
+                  num.trees = optimal_ntree,
+                  tuneGrid = expand.grid(mtry = c(optimal_mtry)),
+                  trControl = RFctrl,
+                  na.action = na.omit)
 
 final_predictions <- predict(RF_tuned, test)
 
@@ -274,7 +280,7 @@ ggsave("figures/ML_outputs/RF_CM.jpeg",
        dpi = 600)
 
 # Create variable importance plot for all features in the model:
-vip(RF_tuned, num_features = 24)
+vip(RF_tuned, num_features = 25)
 
 ggsave("figures/ML_outputs/RF_vip.jpeg",
        width = 6, 

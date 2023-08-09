@@ -3,7 +3,7 @@
 ################################################################################
 
 # Install and load required packages:
-rq_packages <- c("readr", "tidyverse", "caret", "broom", "vip")
+rq_packages <- c("readr", "tidyverse", "caret", "broom", "vip", "splitTools")
 
 installed_packages <- rq_packages %in% rownames(installed.packages())
 if (any(installed_packages == FALSE)) {
@@ -76,49 +76,52 @@ rice_train <- downSample(x = train[, -ncol(train)],
 # View distribution of classes in balanced dataset
 table(rice_train$rice_combined)
 
-rice_train <- rice_train %>% select(-Class)
+rice_train <- rice_train %>% dplyr::select(-Class)
 
-# For wheat flour: 
-set.seed(123)
-wheatf_train <- downSample(x = train[, -ncol(train)],
-                           y = train$wheat_flour)
+# Code in this next secion now required:
 
-table(wheatf_train$wheat_flour)
-
-wheatf_train <- wheatf_train %>% select(-Class)
-
-# For maize flour: 
-set.seed(123)
-maizef_train <- downSample(x = train[, - ncol(train)],
-                           y = train$maize_flour)
-
-table(maizef_train$maize_flour)
-
-maizef_train <- maizef_train %>% select(-Class)
-
-# For risk of inadequate diet: 
-set.seed(123)
-MNrisk_train <- downSample(x = train[, -ncol(train)],
-                           y = train$risk_MND)
-
-# See distribution of classes in balanced dataset: 
-table(MNrisk_train$risk_MND)
-
-MNrisk_train <- MNrisk_train %>% select(-Class)
+# # For wheat flour: 
+# set.seed(123)
+# wheatf_train <- downSample(x = train[, -ncol(train)],
+#                            y = train$wheat_flour)
+# 
+# table(wheatf_train$wheat_flour)
+# 
+# wheatf_train <- wheatf_train %>% select(-Class)
+# 
+# # For maize flour: 
+# set.seed(123)
+# maizef_train <- downSample(x = train[, - ncol(train)],
+#                            y = train$maize_flour)
+# 
+# table(maizef_train$maize_flour)
+# 
+# maizef_train <- maizef_train %>% select(-Class)
+# 
+# # For risk of inadequate diet: 
+# set.seed(123)
+# MNrisk_train <- downSample(x = train[, -ncol(train)],
+#                            y = train$risk_MND)
+# 
+# # See distribution of classes in balanced dataset: 
+# table(MNrisk_train$risk_MND)
+# 
+# MNrisk_train <- MNrisk_train %>% select(-Class)
 
 #-------------------------------------------------------------------------------
 
 # RICE:
 
 # Fit logistic regression model using training data:
-LR_rice <- train(rice_combined ~ dwelling_tenure + material_floor + electricity +
-                   water_source + toilet_facility + n_per_room + agricultural_land +
-                   radio + tv + smart_phones + reg_mobile_phone + fridge +
-                   cars_vehicles + proportion_male + proportion_christian +
-                   proportion_muslim + proportion_traditional + proportion_primary +
-                   proportion_secondary + proportion_higher +
-                   proportion_wage_salary + proportion_own_agriculture +
-                   proportion_own_NFE + proportion_trainee_apprentice,
+LR_rice <- train(rice_combined ~ geography + total_consumption + radio + tv +
+                   fridge + cars_vehicles + mobile_phone + dwelling_free +
+                   dwelling_rented + dwelling_owned + material_floor + 
+                   electricity + water_source + open_defecaetion + 
+                   toilet_unimproved + toilet_improved + n_per_room +
+                   agricultural_land + proportion_male + proportion_primary +
+                   proportion_secondary + proportion_higher + 
+                   proportion_wage_salary + proportion_own_agriculture + 
+                   proportion_own_NFE,
                  data = rice_train,
                  method = "glm",
                  family = binomial)
@@ -160,7 +163,7 @@ ggsave("figures/ML_outputs/LR_CM.jpeg",
        height = 4,
        dpi = 600)
 
-vip(LR_rice, num_features = 25)
+vip(LR_rice, num_features = 26)
 
 ggsave("figures/ML_outputs/LR_vip.jpeg",
        width = 6,
@@ -172,128 +175,130 @@ rm(list = c("LR_matrix", "LR_rice", "LR.prec_recall", "LR.sens_spec",
 
 #-------------------------------------------------------------------------------
 
-# WHEAT FLOUR:
+# Models for wheat and maize not used.
 
-# Fit logistic regression model using training data:
-LR_wheatf <- train(wheat_flour ~ dwelling_tenure + material_floor + electricity +
-                   water_source + toilet_facility + n_per_room + agricultural_land +
-                   radio + tv + smart_phones + reg_mobile_phone + fridge +
-                   cars_vehicles + proportion_male + proportion_christian +
-                   proportion_muslim + proportion_traditional + proportion_primary +
-                   proportion_secondary + proportion_higher +
-                   proportion_wage_salary + proportion_own_agriculture +
-                   proportion_own_NFE + proportion_trainee_apprentice,
-                 data = wheatf_train,
-                 method = "glm",
-                 family = binomial)
-
-summary(LR_wheatf)
-
-# Make predictions on the test data using the Logistic regression model:
-wf.LR_predictions <- predict(LR_wheatf, test)
-
-# Get precision-recall and confusion matrix
-wf.prec_recall <- confusionMatrix(wf.LR_predictions, test$wheat_flour,
-                                  mode = "prec_recall",
-                                  positive = "Yes")
-
-wf.prec_recall
-
-# Get sensitivity/specificity:
-wf.sens_spec <- confusionMatrix(wf.LR_predictions, test$wheat_flour,
-                                mode = "sens_spec",
-                                positive = "Yes")
-
-wf.sens_spec
-
-# Create visualisation for confusion matrix:
-wf.LR_matrix <- as.data.frame(wf.prec_recall$table)
-wf.LR_matrix$Prediction <- factor(wf.LR_matrix$Prediction,
-                               levels=rev(levels(wf.LR_matrix$Prediction)))
-
-ggplot(wf.LR_matrix, aes(Prediction,Reference, fill= Freq)) +
-  geom_tile() + geom_text(aes(label=Freq)) +
-  scale_fill_gradient(low="white", high="#006db6") +
-  labs(x = "Ground truth",y = "Prediction") +
-  scale_x_discrete(labels=c("Access to wheat flour","No access")) +
-  scale_y_discrete(labels=c("No access","Access to wheat flour"))
-
-# Save the confusion matrix:
-ggsave("figures/ML_outputs/wheat_flour/LR_CM.jpeg",
-       width = 6,
-       height = 4,
-       dpi = 600)
-
-vip(LR_wheatf, num_features = 25)
-
-ggsave("figures/ML_outputs/wheat_flour/LR_vip.jpeg",
-       width = 6,
-       height = 4,
-       dpi = 600)
-
-rm(list = c("LR_wheatf", "wf.LR_matrix", "wf.prec_recall", "wf.sens_spec", 
-            "wheatf_train", "wf.LR_predictions"))
-
-#-------------------------------------------------------------------------------
-
-# MAIZE FLOUR:
-
-# Fit logistic regression model using training data:
-LR_maizef <- train(maize_flour ~ dwelling_tenure + material_floor + electricity +
-                   water_source + toilet_facility + n_per_room + agricultural_land +
-                   radio + tv + smart_phones + reg_mobile_phone + fridge +
-                   cars_vehicles + proportion_male + proportion_christian +
-                   proportion_muslim + proportion_traditional + proportion_primary +
-                   proportion_secondary + proportion_higher +
-                   proportion_wage_salary + proportion_own_agriculture +
-                   proportion_own_NFE + proportion_trainee_apprentice,
-                 data = maizef_train,
-                 method = "glm",
-                 family = binomial)
-
-summary(LR_maizef)
-
-# Make predictions on the test data using the Logistic regression model:
-mf.LR_predictions <- predict(LR_maizef, test)
-
-# Get precision-recall and confusion matrix
-mf.prec_recall <- confusionMatrix(mf.LR_predictions, test$maize_flour,
-                                  mode = "prec_recall",
-                                  positive = "Yes")
-
-mf.prec_recall
-
-# Get sensitivity/specificity:
-mf.sens_spec <- confusionMatrix(mf.LR_predictions, test$maize_flour,
-                                mode = "sens_spec",
-                                positive = "Yes")
-
-mf.sens_spec
-
-# Create visualisation for confusion matrix:
-mf.LR_matrix <- as.data.frame(mf.prec_recall$table)
-mf.LR_matrix$Prediction <- factor(mf.LR_matrix$Prediction,
-                               levels=rev(levels(mf.LR_matrix$Prediction)))
-
-ggplot(mf.LR_matrix, aes(Prediction,Reference, fill= Freq)) +
-  geom_tile() + geom_text(aes(label=Freq)) +
-  scale_fill_gradient(low="white", high="#006db6") +
-  labs(x = "Ground truth",y = "Prediction") +
-  scale_x_discrete(labels=c("Access to rice","No access")) +
-  scale_y_discrete(labels=c("No access","Access to rice"))
-
-# Save the confusion matrix:
-ggsave("figures/ML_outputs/maize_flour/LR_CM.jpeg",
-       width = 6,
-       height = 4,
-       dpi = 600)
-
-vip(LR_maizef, num_features = 25)
-
-ggsave("figures/ML_outputs/maize_flour/LR_vip.jpeg",
-       width = 6,
-       height = 4,
-       dpi = 600)
+# # WHEAT FLOUR:
+# 
+# # Fit logistic regression model using training data:
+# LR_wheatf <- train(wheat_flour ~ dwelling_tenure + material_floor + electricity +
+#                    water_source + toilet_facility + n_per_room + agricultural_land +
+#                    radio + tv + smart_phones + reg_mobile_phone + fridge +
+#                    cars_vehicles + proportion_male + proportion_christian +
+#                    proportion_muslim + proportion_traditional + proportion_primary +
+#                    proportion_secondary + proportion_higher +
+#                    proportion_wage_salary + proportion_own_agriculture +
+#                    proportion_own_NFE + proportion_trainee_apprentice,
+#                  data = wheatf_train,
+#                  method = "glm",
+#                  family = binomial)
+# 
+# summary(LR_wheatf)
+# 
+# # Make predictions on the test data using the Logistic regression model:
+# wf.LR_predictions <- predict(LR_wheatf, test)
+# 
+# # Get precision-recall and confusion matrix
+# wf.prec_recall <- confusionMatrix(wf.LR_predictions, test$wheat_flour,
+#                                   mode = "prec_recall",
+#                                   positive = "Yes")
+# 
+# wf.prec_recall
+# 
+# # Get sensitivity/specificity:
+# wf.sens_spec <- confusionMatrix(wf.LR_predictions, test$wheat_flour,
+#                                 mode = "sens_spec",
+#                                 positive = "Yes")
+# 
+# wf.sens_spec
+# 
+# # Create visualisation for confusion matrix:
+# wf.LR_matrix <- as.data.frame(wf.prec_recall$table)
+# wf.LR_matrix$Prediction <- factor(wf.LR_matrix$Prediction,
+#                                levels=rev(levels(wf.LR_matrix$Prediction)))
+# 
+# ggplot(wf.LR_matrix, aes(Prediction,Reference, fill= Freq)) +
+#   geom_tile() + geom_text(aes(label=Freq)) +
+#   scale_fill_gradient(low="white", high="#006db6") +
+#   labs(x = "Ground truth",y = "Prediction") +
+#   scale_x_discrete(labels=c("Access to wheat flour","No access")) +
+#   scale_y_discrete(labels=c("No access","Access to wheat flour"))
+# 
+# # Save the confusion matrix:
+# ggsave("figures/ML_outputs/wheat_flour/LR_CM.jpeg",
+#        width = 6,
+#        height = 4,
+#        dpi = 600)
+# 
+# vip(LR_wheatf, num_features = 25)
+# 
+# ggsave("figures/ML_outputs/wheat_flour/LR_vip.jpeg",
+#        width = 6,
+#        height = 4,
+#        dpi = 600)
+# 
+# rm(list = c("LR_wheatf", "wf.LR_matrix", "wf.prec_recall", "wf.sens_spec", 
+#             "wheatf_train", "wf.LR_predictions"))
+# 
+# #-------------------------------------------------------------------------------
+# 
+# # MAIZE FLOUR:
+# 
+# # Fit logistic regression model using training data:
+# LR_maizef <- train(maize_flour ~ dwelling_tenure + material_floor + electricity +
+#                    water_source + toilet_facility + n_per_room + agricultural_land +
+#                    radio + tv + smart_phones + reg_mobile_phone + fridge +
+#                    cars_vehicles + proportion_male + proportion_christian +
+#                    proportion_muslim + proportion_traditional + proportion_primary +
+#                    proportion_secondary + proportion_higher +
+#                    proportion_wage_salary + proportion_own_agriculture +
+#                    proportion_own_NFE + proportion_trainee_apprentice,
+#                  data = maizef_train,
+#                  method = "glm",
+#                  family = binomial)
+# 
+# summary(LR_maizef)
+# 
+# # Make predictions on the test data using the Logistic regression model:
+# mf.LR_predictions <- predict(LR_maizef, test)
+# 
+# # Get precision-recall and confusion matrix
+# mf.prec_recall <- confusionMatrix(mf.LR_predictions, test$maize_flour,
+#                                   mode = "prec_recall",
+#                                   positive = "Yes")
+# 
+# mf.prec_recall
+# 
+# # Get sensitivity/specificity:
+# mf.sens_spec <- confusionMatrix(mf.LR_predictions, test$maize_flour,
+#                                 mode = "sens_spec",
+#                                 positive = "Yes")
+# 
+# mf.sens_spec
+# 
+# # Create visualisation for confusion matrix:
+# mf.LR_matrix <- as.data.frame(mf.prec_recall$table)
+# mf.LR_matrix$Prediction <- factor(mf.LR_matrix$Prediction,
+#                                levels=rev(levels(mf.LR_matrix$Prediction)))
+# 
+# ggplot(mf.LR_matrix, aes(Prediction,Reference, fill= Freq)) +
+#   geom_tile() + geom_text(aes(label=Freq)) +
+#   scale_fill_gradient(low="white", high="#006db6") +
+#   labs(x = "Ground truth",y = "Prediction") +
+#   scale_x_discrete(labels=c("Access to rice","No access")) +
+#   scale_y_discrete(labels=c("No access","Access to rice"))
+# 
+# # Save the confusion matrix:
+# ggsave("figures/ML_outputs/maize_flour/LR_CM.jpeg",
+#        width = 6,
+#        height = 4,
+#        dpi = 600)
+# 
+# vip(LR_maizef, num_features = 25)
+# 
+# ggsave("figures/ML_outputs/maize_flour/LR_vip.jpeg",
+#        width = 6,
+#        height = 4,
+#        dpi = 600)
 
 #-------------------------------------------------------------------------------
 

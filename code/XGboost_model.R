@@ -3,7 +3,8 @@
 ################################################################################
 
 # Install and load required packages:
-rq_packages <- c("tidyverse", "caret", "xgboost", "doMC", "vip")
+rq_packages <- c("tidyverse", "caret", "xgboost", "doMC", "vip", "splitTools",
+                 "precrec")
 
 installed_packages <- rq_packages %in% rownames(installed.packages())
 if (any(installed_packages == FALSE)) {
@@ -76,7 +77,7 @@ rice_train <- downSample(x = train[, -ncol(train)],
 # View distribution of classes in balanced dataset
 table(rice_train$rice_combined)
 
-rice_train <- rice_train %>% select(-Class)
+rice_train <- rice_train %>% dplyr::select(-Class)
 
 # For wheat flour: 
 set.seed(123)
@@ -85,7 +86,7 @@ wheatf_train <- downSample(x = train[, -ncol(train)],
 
 table(wheatf_train$wheat_flour)
 
-wheatf_train <- wheatf_train %>% select(-Class)
+wheatf_train <- wheatf_train %>% dplyr::select(-Class)
 
 # For maize flour: 
 set.seed(123)
@@ -94,7 +95,7 @@ maizef_train <- downSample(x = train[, - ncol(train)],
 
 table(maizef_train$maize_flour)
 
-maizef_train <- maizef_train %>% select(-Class)
+maizef_train <- maizef_train %>% dplyr::select(-Class)
 
 
 #-------------------------------------------------------------------------------
@@ -105,24 +106,24 @@ maizef_train <- maizef_train %>% select(-Class)
 XGb_ctrl <- trainControl(method = "cv", # K-fold cross validation
                          number = 5, # Using 5 folds
                          savePredictions = "all", # For confusion matrix
-                         search = "grid", # Grid search for parameter tuning
+                         search = "random", # Grid search for parameter tuning
                          classProbs = TRUE, # Keep class probabilities
                          summaryFunction = twoClassSummary) # For ROC, sens, spec
 
 # Fit an XGboost model using defualt parameter settings:
 
-set.seed(111) 
+set.seed(20) 
 
 # Train the model including hyperparameter tuning: 
-tuning_XGb <- train(rice_combined ~ dwelling_tenure + material_floor + electricity +
-                       water_source + toilet_facility + n_per_room + agricultural_land +
-                       radio + tv + smart_phones + reg_mobile_phone + fridge + 
-                       cars_vehicles + proportion_male + proportion_christian + 
-                       proportion_muslim + proportion_traditional + proportion_primary + 
-                       proportion_secondary + proportion_higher + 
-                       proportion_wage_salary + proportion_own_agriculture + 
-                       proportion_own_NFE + proportion_trainee_apprentice + geography +
-                       total_consumption,
+tuning_XGb <- train(rice_combined ~ geography + total_consumption + radio + tv +
+                      fridge + cars_vehicles + mobile_phone + dwelling_free +
+                      dwelling_rented + dwelling_owned + material_floor + 
+                      electricity + water_source + open_defecaetion + 
+                      toilet_unimproved + toilet_improved + n_per_room +
+                      agricultural_land + proportion_male + proportion_primary +
+                      proportion_secondary + proportion_higher + 
+                      proportion_wage_salary + proportion_own_agriculture + 
+                      proportion_own_NFE,
                      data = rice_train, 
                      method = "xgbTree",
                      trControl = XGb_ctrl)
@@ -137,11 +138,11 @@ optimal_max_depth <- as.numeric(tuning_XGb$bestTune$max_depth)
 optimal_eta <- tuning_XGb$bestTune$eta
 optimal_gamma <- tuning_XGb$bestTune$gamma
 optimal_colsample_bytree <- tuning_XGb$bestTune$colsample_bytree
-optimal_min_child_weight <- tuning_XGb$bestTune$min_child_weight
+optimal_min_child_weight <- as.numeric(tuning_XGb$bestTune$min_child_weight)
 optimal_subsample <- tuning_XGb$bestTune$subsample
 
-# nrounds = 50, max_depth = 3, eta = 0.3, gamma = 0, colsample_bytree = 0.6,
-# min_child_weight = 1, subsample = 1
+# nrounds = 888, max_depth = 2, eta = 0.27, gamma = 2.89, colsample_bytree = 0.31,
+# min_child_weight = 20, subsample = 0.99 (2 dp for)
 
 #-------------------------------------------------------------------------------
 
@@ -160,17 +161,17 @@ tuning_grid <- expand.grid(nrounds = c(optimal_nrounds),
 # Run models in parallel using parallel computing:
 registerDoMC(cores = 4)
 
-set.seed(650)
+set.seed(50)
 
-XGb_final <- train(rice_combined ~ dwelling_tenure + material_floor + electricity +
-                      water_source + toilet_facility + n_per_room + agricultural_land +
-                      radio + tv + smart_phones + reg_mobile_phone + fridge + 
-                      cars_vehicles + proportion_male + proportion_christian + 
-                      proportion_muslim + proportion_traditional + proportion_primary + 
-                      proportion_secondary + proportion_higher + 
-                      proportion_wage_salary + proportion_own_agriculture + 
-                      proportion_own_NFE + proportion_trainee_apprentice + geography +
-                      total_consumption,
+XGb_final <- train(rice_combined ~ geography + total_consumption + radio + tv +
+                     fridge + cars_vehicles + mobile_phone + dwelling_free +
+                     dwelling_rented + dwelling_owned + material_floor + 
+                     electricity + water_source + open_defecaetion + 
+                     toilet_unimproved + toilet_improved + n_per_room +
+                     agricultural_land + proportion_male + proportion_primary +
+                     proportion_secondary + proportion_higher + 
+                     proportion_wage_salary + proportion_own_agriculture + 
+                     proportion_own_NFE,
                     data = rice_train, 
                     method = "xgbTree",
                     trControl = XGb_ctrl,
@@ -220,6 +221,15 @@ ggsave("figures/ML_outputs/rice/vipXGB.jpeg",
        width = 6, 
        height = 4, 
        dpi = 600)
+
+#-------------------------------------------------------------------------------
+
+# Revisit if there's time to add ROC
+# # ROC Curve: 
+# XGb_ROC <- evalmod(scores = as.numeric(xgb_predictions$xgb_predictions),
+#                    labels = as.numeric(test$rice_combined))
+# 
+# autoplot(XGb_ROC)
 
 #-------------------------------------------------------------------------------
 
@@ -296,15 +306,15 @@ for (i in quintiles) {
 
 set.seed(123)
 
-wf.tuning_XGb <- train(wheat_flour ~ dwelling_tenure + material_floor + electricity +
-                       water_source + toilet_facility + n_per_room + agricultural_land +
-                       radio + tv + smart_phones + reg_mobile_phone + fridge + 
-                       cars_vehicles + proportion_male + proportion_christian + 
-                       proportion_muslim + proportion_traditional + proportion_primary + 
-                       proportion_secondary + proportion_higher + 
-                       proportion_wage_salary + proportion_own_agriculture + 
-                       proportion_own_NFE + proportion_trainee_apprentice + geography +
-                       total_consumption,
+wf.tuning_XGb <- train(wheat_flour ~ geography + total_consumption + radio + tv +
+                         fridge + cars_vehicles + mobile_phone + dwelling_free +
+                         dwelling_rented + dwelling_owned + material_floor + 
+                         electricity + water_source + open_defecaetion + 
+                         toilet_unimproved + toilet_improved + n_per_room +
+                         agricultural_land + proportion_male + proportion_primary +
+                         proportion_secondary + proportion_higher + 
+                         proportion_wage_salary + proportion_own_agriculture + 
+                         proportion_own_NFE,
                      data = wheatf_train, 
                      method = "xgbTree",
                      trControl = XGb_ctrl)
@@ -316,13 +326,13 @@ confusionMatrix(wf.tuning_XGb,
                 positive = "Yes")
 
 # Store the optimal hyper-parameters
-wf.nrounds <- wf.tuning_XGb$bestTune$nrounds # 150
-wf.max_depth <- as.numeric(wf.tuning_XGb$bestTune$max_depth) # 1
-wf.eta <- wf.tuning_XGb$bestTune$eta # 0.3
-wf.gamma <- wf.tuning_XGb$bestTune$gamma # 0
-wf.colsample_bytree <- wf.tuning_XGb$bestTune$colsample_bytree # 0.6
-wf.min_child_weight <- wf.tuning_XGb$bestTune$min_child_weight # 1
-wf.subsample <- wf.tuning_XGb$bestTune$subsample # 1
+wf.nrounds <- wf.tuning_XGb$bestTune$nrounds # 526
+wf.max_depth <- as.numeric(wf.tuning_XGb$bestTune$max_depth) # 2
+wf.eta <- wf.tuning_XGb$bestTune$eta # 0.27
+wf.gamma <- wf.tuning_XGb$bestTune$gamma # 6.78
+wf.colsample_bytree <- wf.tuning_XGb$bestTune$colsample_bytree # 0.66
+wf.min_child_weight <- as.numeric(wf.tuning_XGb$bestTune$min_child_weight) # 18
+wf.subsample <- wf.tuning_XGb$bestTune$subsample # 0.78
 
 #-------------------------------------------------------------------------------
 
@@ -343,15 +353,15 @@ registerDoMC(cores = 4)
 
 set.seed(123)
 
-wf.XGb_final <- train(wheat_flour ~ dwelling_tenure + material_floor + electricity +
-                     water_source + toilet_facility + n_per_room + agricultural_land +
-                     radio + tv + smart_phones + reg_mobile_phone + fridge + 
-                     cars_vehicles + proportion_male + proportion_christian + 
-                     proportion_muslim + proportion_traditional + proportion_primary + 
-                     proportion_secondary + proportion_higher + 
-                     proportion_wage_salary + proportion_own_agriculture + 
-                     proportion_own_NFE + proportion_trainee_apprentice + geography +
-                     total_consumption,
+wf.XGb_final <- train(wheat_flour ~ geography + total_consumption + radio + tv +
+                        fridge + cars_vehicles + mobile_phone + dwelling_free +
+                        dwelling_rented + dwelling_owned + material_floor + 
+                        electricity + water_source + open_defecaetion + 
+                        toilet_unimproved + toilet_improved + n_per_room +
+                        agricultural_land + proportion_male + proportion_primary +
+                        proportion_secondary + proportion_higher + 
+                        proportion_wage_salary + proportion_own_agriculture + 
+                        proportion_own_NFE,
                    data = wheatf_train, 
                    method = "xgbTree",
                    trControl = XGb_ctrl,
@@ -483,15 +493,15 @@ rm(list = c("wheatf_train", "quintile_test", "quintile_CM", "rural_test", "urban
 
 # Fit an XGboost model using defualt parameter settings:
 
-mf.tuning_XGb <- train(maize_flour ~ dwelling_tenure + material_floor + electricity +
-                          water_source + toilet_facility + n_per_room + agricultural_land +
-                          radio + tv + smart_phones + reg_mobile_phone + fridge + 
-                          cars_vehicles + proportion_male + proportion_christian + 
-                          proportion_muslim + proportion_traditional + proportion_primary + 
-                          proportion_secondary + proportion_higher + 
-                          proportion_wage_salary + proportion_own_agriculture + 
-                          proportion_own_NFE + proportion_trainee_apprentice + geography +
-                          total_consumption,
+mf.tuning_XGb <- train(maize_flour ~ geography + total_consumption + radio + tv +
+                         fridge + cars_vehicles + mobile_phone + dwelling_free +
+                         dwelling_rented + dwelling_owned + material_floor + 
+                         electricity + water_source + open_defecaetion + 
+                         toilet_unimproved + toilet_improved + n_per_room +
+                         agricultural_land + proportion_male + proportion_primary +
+                         proportion_secondary + proportion_higher + 
+                         proportion_wage_salary + proportion_own_agriculture + 
+                         proportion_own_NFE,
                         data = maizef_train, 
                         method = "xgbTree",
                         trControl = XGb_ctrl)
@@ -503,13 +513,13 @@ confusionMatrix(mf.tuning_XGb,
                 positive = "Yes")
 
 # Store tuning parameters: 
-mf.nrounds <- mf.tuning_XGb$bestTune$nrounds # 50
+mf.nrounds <- mf.tuning_XGb$bestTune$nrounds # 573
 mf.max_depth <- as.numeric(mf.tuning_XGb$bestTune$max_depth) # 2
-mf.eta <- mf.tuning_XGb$bestTune$eta # 0.4
-mf.gamma <- mf.tuning_XGb$bestTune$gamma # 0
-mf.colsample_bytree <- mf.tuning_XGb$bestTune$colsample_bytree # 0.6
-mf.min_child_weight <- mf.tuning_XGb$bestTune$min_child_weight # 1
-mf.subsample <- mf.tuning_XGb$bestTune$subsample # 1
+mf.eta <- mf.tuning_XGb$bestTune$eta # 0.23
+mf.gamma <- mf.tuning_XGb$bestTune$gamma # 6.88
+mf.colsample_bytree <- mf.tuning_XGb$bestTune$colsample_bytree # 0.54
+mf.min_child_weight <- as.numeric(mf.tuning_XGb$bestTune$min_child_weight) # 12
+mf.subsample <- mf.tuning_XGb$bestTune$subsample # 0.48
 
 #-------------------------------------------------------------------------------
 
@@ -530,15 +540,15 @@ registerDoMC(cores = 4)
 
 set.seed(123)
 
-mf.XGb_final <- train(maize_flour ~ dwelling_tenure + material_floor + electricity +
-                        water_source + toilet_facility + n_per_room + agricultural_land +
-                        radio + tv + smart_phones + reg_mobile_phone + fridge + 
-                        cars_vehicles + proportion_male + proportion_christian + 
-                        proportion_muslim + proportion_traditional + proportion_primary + 
+mf.XGb_final <- train(maize_flour ~ geography + total_consumption + radio + tv +
+                        fridge + cars_vehicles + mobile_phone + dwelling_free +
+                        dwelling_rented + dwelling_owned + material_floor + 
+                        electricity + water_source + open_defecaetion + 
+                        toilet_unimproved + toilet_improved + n_per_room +
+                        agricultural_land + proportion_male + proportion_primary +
                         proportion_secondary + proportion_higher + 
                         proportion_wage_salary + proportion_own_agriculture + 
-                        proportion_own_NFE + proportion_trainee_apprentice + geography +
-                        total_consumption,
+                        proportion_own_NFE,
                       data = maizef_train, 
                       method = "xgbTree",
                       trControl = XGb_ctrl,
@@ -699,7 +709,7 @@ rice_train <- downSample(x = train[, -ncol(train)],
 # View distribution of classes in balanced dataset
 table(rice_train$rice_combined)
 
-rice_train <- rice_train %>% select(-Class)
+rice_train <- rice_train %>% dplyr::select(-Class)
 
 # For wheat flour: 
 set.seed(123)
@@ -708,7 +718,7 @@ wheatf_train <- downSample(x = train[, -ncol(train)],
 
 table(wheatf_train$wheat_flour)
 
-wheatf_train <- wheatf_train %>% select(-Class)
+wheatf_train <- wheatf_train %>% dplyr::select(-Class)
 
 # For maize flour: 
 set.seed(123)
@@ -717,7 +727,7 @@ maizef_train <- downSample(x = train[, - ncol(train)],
 
 table(maizef_train$maize_flour)
 
-maizef_train <- maizef_train %>% select(-Class)
+maizef_train <- maizef_train %>% dplyr::select(-Class)
 
 #-------------------------------------------------------------------------------
 
@@ -728,15 +738,15 @@ maizef_train <- maizef_train %>% select(-Class)
 set.seed(111) 
 
 # Train the model including hyperparameter tuning: 
-ricov.tuning_XGb <- train(rice_combined ~ dwelling_tenure + material_floor + electricity +
-                      water_source + toilet_facility + n_per_room + agricultural_land +
-                      radio + tv + smart_phones + reg_mobile_phone + fridge + 
-                      cars_vehicles + proportion_male + proportion_christian + 
-                      proportion_muslim + proportion_traditional + proportion_primary + 
-                      proportion_secondary + proportion_higher + 
-                      proportion_wage_salary + proportion_own_agriculture + 
-                      proportion_own_NFE + proportion_trainee_apprentice + geography +
-                      total_consumption,
+ricov.tuning_XGb <- train(rice_combined ~ geography + total_consumption + radio + tv +
+                            fridge + cars_vehicles + mobile_phone + dwelling_free +
+                            dwelling_rented + dwelling_owned + material_floor + 
+                            electricity + water_source + open_defecaetion + 
+                            toilet_unimproved + toilet_improved + n_per_room +
+                            agricultural_land + proportion_male + proportion_primary +
+                            proportion_secondary + proportion_higher + 
+                            proportion_wage_salary + proportion_own_agriculture + 
+                            proportion_own_NFE,
                     data = rice_train, 
                     method = "xgbTree",
                     trControl = XGb_ctrl)
@@ -746,13 +756,13 @@ ricov.tuning_XGb
 confusionMatrix(ricov.tuning_XGb, positive = "Yes")
 
 # Store the optimal hyper-parameters
-optimal_nrounds <- ricov.tuning_XGb$bestTune$nrounds # 100
-optimal_max_depth <- as.numeric(ricov.tuning_XGb$bestTune$max_depth) # 2
-optimal_eta <- ricov.tuning_XGb$bestTune$eta # 0.3
-optimal_gamma <- ricov.tuning_XGb$bestTune$gamma # 0
-optimal_colsample_bytree <- ricov.tuning_XGb$bestTune$colsample_bytree # 0.6
-optimal_min_child_weight <- ricov.tuning_XGb$bestTune$min_child_weight # 1
-optimal_subsample <- ricov.tuning_XGb$bestTune$subsample # 0.75
+optimal_nrounds <- ricov.tuning_XGb$bestTune$nrounds # 175
+optimal_max_depth <- as.numeric(ricov.tuning_XGb$bestTune$max_depth) # 3
+optimal_eta <- ricov.tuning_XGb$bestTune$eta # 0.35
+optimal_gamma <- ricov.tuning_XGb$bestTune$gamma # 1.56
+optimal_colsample_bytree <- ricov.tuning_XGb$bestTune$colsample_bytree # 0.69
+optimal_min_child_weight <- as.numeric(ricov.tuning_XGb$bestTune$min_child_weight) # 15
+optimal_subsample <- ricov.tuning_XGb$bestTune$subsample # 0.46
 
 #-------------------------------------------------------------------------------
 
@@ -773,15 +783,15 @@ registerDoMC(cores = 4)
 
 set.seed(650)
 
-ricov.XGb_final <- train(rice_combined ~ dwelling_tenure + material_floor + electricity +
-                     water_source + toilet_facility + n_per_room + agricultural_land +
-                     radio + tv + smart_phones + reg_mobile_phone + fridge + 
-                     cars_vehicles + proportion_male + proportion_christian + 
-                     proportion_muslim + proportion_traditional + proportion_primary + 
-                     proportion_secondary + proportion_higher + 
-                     proportion_wage_salary + proportion_own_agriculture + 
-                     proportion_own_NFE + proportion_trainee_apprentice + geography +
-                     total_consumption,
+ricov.XGb_final <- train(rice_combined ~ geography + total_consumption + radio + tv +
+                           fridge + cars_vehicles + mobile_phone + dwelling_free +
+                           dwelling_rented + dwelling_owned + material_floor + 
+                           electricity + water_source + open_defecaetion + 
+                           toilet_unimproved + toilet_improved + n_per_room +
+                           agricultural_land + proportion_male + proportion_primary +
+                           proportion_secondary + proportion_higher + 
+                           proportion_wage_salary + proportion_own_agriculture + 
+                           proportion_own_NFE,
                    data = rice_train, 
                    method = "xgbTree",
                    trControl = XGb_ctrl,
@@ -857,7 +867,7 @@ confusionMatrix(ricov.urban.xgb_predictions, urban_test$rice_combined,
                 positive = "Yes")
 
 # Sensitvity and specificity for urban populations:
-confusionMatrix(urban.xgb_predictions, urban_test$rice_combined, 
+confusionMatrix(ricov.urban.xgb_predictions, urban_test$rice_combined, 
                 mode = "sens_spec", 
                 positive = "Yes")
 
@@ -919,15 +929,15 @@ rm(list = c("rice_train", "ricov.tuning_XGb", "ricov.XGb_final",
 
 set.seed(123)
 
-wfcov.tuning_XGb <- train(wheat_flour ~ dwelling_tenure + material_floor + electricity +
-                         water_source + toilet_facility + n_per_room + agricultural_land +
-                         radio + tv + smart_phones + reg_mobile_phone + fridge + 
-                         cars_vehicles + proportion_male + proportion_christian + 
-                         proportion_muslim + proportion_traditional + proportion_primary + 
-                         proportion_secondary + proportion_higher + 
-                         proportion_wage_salary + proportion_own_agriculture + 
-                         proportion_own_NFE + proportion_trainee_apprentice + geography +
-                         total_consumption,
+wfcov.tuning_XGb <- train(wheat_flour ~ geography + total_consumption + radio + tv +
+                            fridge + cars_vehicles + mobile_phone + dwelling_free +
+                            dwelling_rented + dwelling_owned + material_floor + 
+                            electricity + water_source + open_defecaetion + 
+                            toilet_unimproved + toilet_improved + n_per_room +
+                            agricultural_land + proportion_male + proportion_primary +
+                            proportion_secondary + proportion_higher + 
+                            proportion_wage_salary + proportion_own_agriculture + 
+                            proportion_own_NFE,
                        data = wheatf_train, 
                        method = "xgbTree",
                        trControl = XGb_ctrl)
@@ -939,13 +949,13 @@ confusionMatrix(wfcov.tuning_XGb,
                 positive = "Yes")
 
 # Store the optimal hyper-parameters
-wf.nrounds <- wfcov.tuning_XGb$bestTune$nrounds # 50
+wf.nrounds <- wfcov.tuning_XGb$bestTune$nrounds # 526
 wf.max_depth <- as.numeric(wfcov.tuning_XGb$bestTune$max_depth) # 2
-wf.eta <- wfcov.tuning_XGb$bestTune$eta # 0.3
-wf.gamma <- wfcov.tuning_XGb$bestTune$gamma # 0
-wf.colsample_bytree <- wfcov.tuning_XGb$bestTune$colsample_bytree # 0.8
-wf.min_child_weight <- wfcov.tuning_XGb$bestTune$min_child_weight # 1
-wf.subsample <- wfcov.tuning_XGb$bestTune$subsample # 1
+wf.eta <- wfcov.tuning_XGb$bestTune$eta # 0.27
+wf.gamma <- wfcov.tuning_XGb$bestTune$gamma # 6.78
+wf.colsample_bytree <- wfcov.tuning_XGb$bestTune$colsample_bytree # 0.66
+wf.min_child_weight <- as.numeric(wfcov.tuning_XGb$bestTune$min_child_weight) # 18
+wf.subsample <- wfcov.tuning_XGb$bestTune$subsample # 0.78
 
 #-------------------------------------------------------------------------------
 
@@ -966,15 +976,15 @@ registerDoMC(cores = 4)
 
 set.seed(123)
 
-wfcov.XGb_final <- train(wheat_flour ~ dwelling_tenure + material_floor + electricity +
-                        water_source + toilet_facility + n_per_room + agricultural_land +
-                        radio + tv + smart_phones + reg_mobile_phone + fridge + 
-                        cars_vehicles + proportion_male + proportion_christian + 
-                        proportion_muslim + proportion_traditional + proportion_primary + 
-                        proportion_secondary + proportion_higher + 
-                        proportion_wage_salary + proportion_own_agriculture + 
-                        proportion_own_NFE + proportion_trainee_apprentice + geography +
-                        total_consumption,
+wfcov.XGb_final <- train(wheat_flour ~ geography + total_consumption + radio + tv +
+                           fridge + cars_vehicles + mobile_phone + dwelling_free +
+                           dwelling_rented + dwelling_owned + material_floor + 
+                           electricity + water_source + open_defecaetion + 
+                           toilet_unimproved + toilet_improved + n_per_room +
+                           agricultural_land + proportion_male + proportion_primary +
+                           proportion_secondary + proportion_higher + 
+                           proportion_wage_salary + proportion_own_agriculture + 
+                           proportion_own_NFE,
                       data = wheatf_train, 
                       method = "xgbTree",
                       trControl = XGb_ctrl,
@@ -1118,15 +1128,15 @@ rm(list = c("quintile_CM", "quintile_test", "wf.covtuning_grid", "wf.XGb_final",
 
 # Fit an XGboost model using defualt parameter settings:
 
-mfcov.tuning_XGb <- train(maize_flour ~ dwelling_tenure + material_floor + electricity +
-                         water_source + toilet_facility + n_per_room + agricultural_land +
-                         radio + tv + smart_phones + reg_mobile_phone + fridge + 
-                         cars_vehicles + proportion_male + proportion_christian + 
-                         proportion_muslim + proportion_traditional + proportion_primary + 
-                         proportion_secondary + proportion_higher + 
-                         proportion_wage_salary + proportion_own_agriculture + 
-                         proportion_own_NFE + proportion_trainee_apprentice + geography +
-                         total_consumption,
+mfcov.tuning_XGb <- train(maize_flour ~ geography + total_consumption + radio + tv +
+                            fridge + cars_vehicles + mobile_phone + dwelling_free +
+                            dwelling_rented + dwelling_owned + material_floor + 
+                            electricity + water_source + open_defecaetion + 
+                            toilet_unimproved + toilet_improved + n_per_room +
+                            agricultural_land + proportion_male + proportion_primary +
+                            proportion_secondary + proportion_higher + 
+                            proportion_wage_salary + proportion_own_agriculture + 
+                            proportion_own_NFE,
                        data = maizef_train, 
                        method = "xgbTree",
                        trControl = XGb_ctrl)
@@ -1138,13 +1148,13 @@ confusionMatrix(mfcov.tuning_XGb,
                 positive = "Yes")
 
 # Store tuning parameters: 
-mf.nrounds <- mfcov.tuning_XGb$bestTune$nrounds # 50
-mf.max_depth <- as.numeric(mfcov.tuning_XGb$bestTune$max_depth) # 2
-mf.eta <- mfcov.tuning_XGb$bestTune$eta # 0.4
-mf.gamma <- mfcov.tuning_XGb$bestTune$gamma # 0
-mf.colsample_bytree <- mfcov.tuning_XGb$bestTune$colsample_bytree # 0.6
-mf.min_child_weight <- mfcov.tuning_XGb$bestTune$min_child_weight # 1
-mf.subsample <- mfcov.tuning_XGb$bestTune$subsample # 1
+mf.nrounds <- mfcov.tuning_XGb$bestTune$nrounds # 160
+mf.max_depth <- as.numeric(mfcov.tuning_XGb$bestTune$max_depth) # 5
+mf.eta <- mfcov.tuning_XGb$bestTune$eta # 0.02
+mf.gamma <- mfcov.tuning_XGb$bestTune$gamma # 2.95
+mf.colsample_bytree <- as.numeric(mfcov.tuning_XGb$bestTune$colsample_bytree) # 0.63
+mf.min_child_weight <- as.numeric(mfcov.tuning_XGb$bestTune$min_child_weight) # 17
+mf.subsample <- mfcov.tuning_XGb$bestTune$subsample # 0.30
 
 #-------------------------------------------------------------------------------
 
@@ -1165,15 +1175,15 @@ registerDoMC(cores = 4)
 
 set.seed(123)
 
-mfcov.XGb_final <- train(maize_flour ~ dwelling_tenure + material_floor + electricity +
-                        water_source + toilet_facility + n_per_room + agricultural_land +
-                        radio + tv + smart_phones + reg_mobile_phone + fridge + 
-                        cars_vehicles + proportion_male + proportion_christian + 
-                        proportion_muslim + proportion_traditional + proportion_primary + 
-                        proportion_secondary + proportion_higher + 
-                        proportion_wage_salary + proportion_own_agriculture + 
-                        proportion_own_NFE + proportion_trainee_apprentice + geography +
-                        total_consumption,
+mfcov.XGb_final <- train(maize_flour ~ geography + total_consumption + radio + tv +
+                           fridge + cars_vehicles + mobile_phone + dwelling_free +
+                           dwelling_rented + dwelling_owned + material_floor + 
+                           electricity + water_source + open_defecaetion + 
+                           toilet_unimproved + toilet_improved + n_per_room +
+                           agricultural_land + proportion_male + proportion_primary +
+                           proportion_secondary + proportion_higher + 
+                           proportion_wage_salary + proportion_own_agriculture + 
+                           proportion_own_NFE,
                       data = maizef_train, 
                       method = "xgbTree",
                       trControl = XGb_ctrl,

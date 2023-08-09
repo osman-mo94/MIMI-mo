@@ -48,7 +48,7 @@ rm(list = c("predictive_inputs", "target_variables"))
 # Add-ADM2 location: 
 
 cover <- read_csv("NLSS_data/Household/secta_cover.csv")
-household_locations <- cover %>% dplyr::select("hhid", "lga")
+household_locations <- cover %>% dplyr::select("hhid", "lga", "state")
 
 analysis_df <- analysis_df %>% left_join(household_locations, by = "hhid")
 
@@ -62,12 +62,14 @@ vapply(analysis_df, function(x) mean(is.na(x)), c(num = 0))
 # Use imputation via bagged trees to deal with missing data:
 impute_recipe <- recipe(rice_combined ~ ., data = analysis_df) %>% 
   # Firstly specify which variables require imputation:
-  step_impute_bag(risk_MND, material_floor, water_source, toilet_facility, radio,
-                  tv, smart_phones, reg_mobile_phone, fridge, cars_vehicles, 
+  step_impute_bag(geography, total_consumption, consumption_quintile, radio, tv,
+                  fridge, cars_vehicles, mobile_phone, dwelling_free, 
+                  dwelling_rented, dwelling_owned, material_floor, electricity, 
+                  water_source, open_defecaetion, toilet_unimproved, 
+                  toilet_improved, n_per_room, agricultural_land, proportion_male,
                   proportion_primary, proportion_secondary, proportion_higher, 
                   proportion_wage_salary, proportion_own_agriculture, 
                   proportion_own_NFE, proportion_trainee_apprentice,
-                  total_consumption, consumption_quintile,
                   trained = FALSE, 
                   impute_with = imp_vars(all_predictors()), # using all vars
                   trees = 25, # 25 bagged trees
