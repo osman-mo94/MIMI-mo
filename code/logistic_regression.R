@@ -169,9 +169,24 @@ ggsave("figures/ML_outputs/LR_vip.jpeg",
        width = 6,
        height = 4,
        dpi = 600)
+# 
+# rm(list = c("LR_matrix", "LR_rice", "LR.prec_recall", "LR.sens_spec", 
+#             "LR_predictions", "rice_train"))
 
-rm(list = c("LR_matrix", "LR_rice", "LR.prec_recall", "LR.sens_spec", 
-            "LR_predictions", "rice_train"))
+#-------------------------------------------------------------------------------
+
+# CREATE ROC CURVE FOR REACH RICE: 
+
+rice_ROC <- roc(response = as.numeric(test$rice_combined),
+                predictor = as.numeric(LR_predictions),
+                smoothed = TRUE, 
+                plot = TRUE, 
+                auc.polygon = TRUE, 
+                max.auc.polygon = TRUE,
+                print.auc = TRUE, 
+                show.thres = TRUE)
+
+title("Logistic regression", line = 2.5)
 
 #-------------------------------------------------------------------------------
 

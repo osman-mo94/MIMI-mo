@@ -4,7 +4,7 @@
 
 # Install and load required packages:
 rq_packages <- c("tidyverse", "caret", "xgboost", "doMC", "vip", "splitTools",
-                 "precrec")
+                 "precrec", "pROC")
 
 installed_packages <- rq_packages %in% rownames(installed.packages())
 if (any(installed_packages == FALSE)) {
@@ -56,6 +56,8 @@ analysis_df <- analysis_df %>% relocate(risk_MND, .after = maize_flour)
 # TRAIN-TEST SPLIT: 
 
 # Stratify split by LGA to ensure that we have enough predictions for mapping:
+set.seed(100)
+
 index <- partition(y = analysis_df$lga, p = c(train = 0.8, test = 0.2), 
                    split_into_list = FALSE)
 
@@ -112,7 +114,7 @@ XGb_ctrl <- trainControl(method = "cv", # K-fold cross validation
 
 # Fit an XGboost model using defualt parameter settings:
 
-set.seed(20) 
+set.seed(23) 
 
 # Train the model including hyperparameter tuning: 
 tuning_XGb <- train(rice_combined ~ geography + total_consumption + radio + tv +
@@ -141,8 +143,8 @@ optimal_colsample_bytree <- tuning_XGb$bestTune$colsample_bytree
 optimal_min_child_weight <- as.numeric(tuning_XGb$bestTune$min_child_weight)
 optimal_subsample <- tuning_XGb$bestTune$subsample
 
-# nrounds = 888, max_depth = 2, eta = 0.27, gamma = 2.89, colsample_bytree = 0.31,
-# min_child_weight = 20, subsample = 0.99 (2 dp for)
+# nrounds = 456, max_depth = 2, eta = 0.23, gamma = 1.39, colsample_bytree = 0.68,
+# min_child_weight = 9, subsample = 0.76 (2 dp for)
 
 #-------------------------------------------------------------------------------
 
@@ -224,12 +226,16 @@ ggsave("figures/ML_outputs/rice/vipXGB.jpeg",
 
 #-------------------------------------------------------------------------------
 
-# Revisit if there's time to add ROC
-# # ROC Curve: 
-# XGb_ROC <- evalmod(scores = as.numeric(xgb_predictions$xgb_predictions),
-#                    labels = as.numeric(test$rice_combined))
-# 
-# autoplot(XGb_ROC)
+rice_ROC <- roc(response = as.numeric(test$rice_combined),
+                predictor = as.numeric(xgb_predictions),
+                smoothed = TRUE, 
+                plot = TRUE, 
+                auc.polygon = TRUE, 
+                max.auc.polygon = TRUE,
+                print.auc = TRUE, 
+                show.thres = TRUE)
+
+title("XGBoost", line = 2.5)
 
 #-------------------------------------------------------------------------------
 
@@ -281,6 +287,7 @@ confusionMatrix(rural.xgb_predictions, rural_test$rice_combined,
 # Stratify performance metrics by consumption quintile: 
 
 quintiles <- c(1,2,3,4,5)
+
 
 for (i in quintiles) {
   # Create test data-set for each consumption quintile:
@@ -688,6 +695,8 @@ analysis_df <- analysis_df %>% filter(risk_MND == "Yes")
 # TRAIN-TEST SPLIT: 
 
 # Stratify split by LGA to ensure that we have enough predictions for mapping:
+set.seed(100)
+
 index <- partition(y = analysis_df$lga, p = c(train = 0.8, test = 0.2), 
                    split_into_list = FALSE)
 

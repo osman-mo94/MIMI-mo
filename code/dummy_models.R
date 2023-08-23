@@ -4,7 +4,7 @@
 
 # Install and load required packages:
 rq_packages <- c("tidyverse", "caret", "basemodels", "ggplot2", "mice",
-                 "splitTools")
+                 "splitTools", "pROC", "png")
 
 installed_packages <- rq_packages %in% rownames(installed.packages())
 if (any(installed_packages == FALSE)) {
@@ -79,7 +79,7 @@ rice_train <- downSample(x = train[, -ncol(train)],
 # View distribution of classes in balanced dataset
 table(rice_train$rice_combined)
 
-rice_train <- rice_train %>% select(-Class)
+rice_train <- rice_train %>% dplyr::select(-Class)
 
 # For wheat flour: 
 set.seed(123)
@@ -88,7 +88,7 @@ wheatf_train <- downSample(x = train[, -ncol(train)],
 
 table(wheatf_train$wheat_flour)
 
-wheatf_train <- wheatf_train %>% select(-Class)
+wheatf_train <- wheatf_train %>% dplyr::select(-Class)
 
 # For maize flour: 
 set.seed(123)
@@ -97,7 +97,7 @@ maizef_train <- downSample(x = train[, - ncol(train)],
 
 table(maizef_train$maize_flour)
 
-maizef_train <- maizef_train %>% select(-Class)
+maizef_train <- maizef_train %>% dplyr::select(-Class)
 
 
 #-------------------------------------------------------------------------------
@@ -144,8 +144,24 @@ ggsave("figures/ML_outputs/rice/dummy_CM.jpeg",
        height = 4,
        dpi = 600)
 
-rm(list = c("dmatrix_df", "dummy_model", "prec_recall_matrix", "sens_spec_matrix",
-            "dummy_predictions", "rice_train"))
+# rm(list = c("dmatrix_df", "dummy_model", "prec_recall_matrix", "sens_spec_matrix",
+#             "dummy_predictions", "rice_train"))
+
+#-------------------------------------------------------------------------------
+
+# ROC curve for reach of Rice: 
+
+
+rice_ROC <- roc(response = as.numeric(test$rice_combined),
+                predictor = as.numeric(dummy_predictions),
+                smoothed = TRUE, 
+                plot = TRUE, 
+                auc.polygon = TRUE, 
+                max.auc.polygon = TRUE,
+                print.auc = TRUE, 
+                show.thres = TRUE)
+
+title("Dummy model", line = 2.5)
 
 #-------------------------------------------------------------------------------
 

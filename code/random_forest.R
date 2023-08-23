@@ -4,7 +4,7 @@
 
 # Install and load required packages:
 rq_packages <- c("tidyverse", "ranger", "randomForest", "e1071", "caret", 
-                 "doMC", "vip", "splitTools", "DMwR")
+                 "doMC", "vip", "splitTools", "DMwR", "pROC")
 
 installed_packages <- rq_packages %in% rownames(installed.packages())
 if (any(installed_packages == FALSE)) {
@@ -228,7 +228,7 @@ optimal_mtry <- RF_tuning$finalModel$mtry
 
 # FIT A FINAL TUNED MODEL: 
 
-set.seed(222)
+set.seed(150)
 
 RF_tuned <- train(rice_combined ~ geography + total_consumption + radio + tv +
                     fridge + cars_vehicles + mobile_phone + dwelling_free +
@@ -286,6 +286,20 @@ ggsave("figures/ML_outputs/RF_vip.jpeg",
        width = 6, 
        height = 4, 
        dpi = 600)
+
+#-------------------------------------------------------------------------------
+
+# ROC CURVE FOR REACH RICE: 
+rice_ROC <- roc(response = as.numeric(test$rice_combined),
+                predictor = as.numeric(final_predictions),
+                smoothed = TRUE, 
+                plot = TRUE, 
+                auc.polygon = TRUE, 
+                max.auc.polygon = TRUE,
+                print.auc = TRUE, 
+                show.thres = TRUE)
+
+title("Random forest", line = 2.5)
 
 ################################################################################
 ############################## END OF SCRIPT ###################################
